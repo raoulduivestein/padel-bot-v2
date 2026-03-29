@@ -18,8 +18,33 @@
 
   "booking_rules": [
     {
+      "day": "monday",
+      "times": ["21:00"],
+      "duration": 2
+    },
+    {
       "day": "tuesday",
-      "times": ["08:00"],
+      "times": ["20:00", "09:00"],
+      "duration": 2
+    },
+    {
+      "day": "wednesday",
+      "times": ["20:00"],
+      "duration": 2
+    },
+    {
+      "day": "thursday",
+      "times": ["20:00"],
+      "duration": 2
+    },
+    {
+      "day": "friday",
+      "times": ["21:00"],
+      "duration": 2
+    },
+    {
+      "day": "saturday",
+      "times": ["10:00"],
       "duration": 2
     }
   ]
