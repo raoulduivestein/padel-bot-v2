@@ -7,7 +7,6 @@ from slot_generator import generate_slots
 from booking import book_slots
 
 BOOKING_TIME = (7, 59, 55)
-BOOKING_TIME = (0, 0, 0)
 
 
 def wait_until():
