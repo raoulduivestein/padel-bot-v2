@@ -1,0 +1,26 @@
+{
+  "club_id": 94,
+  "sports_package_id": 63,
+
+  "members": [
+    {
+      "member_id": "bUpDTmkxR2kwMDZWNUk2SVQ5QithUQ==",
+      "name": "Raoul"
+    },
+    {
+      "member_id": "ZktCelEvaGFZRStuaW9kNUE0cytpdw==",
+      "name": "Senn"
+    }
+  ],
+
+  "preferred_courts": [737381, 737383, 737385],
+  "fallback_to_any": true,
+
+  "booking_rules": [
+    {
+      "day": "tuesday",
+      "times": ["08:00"],
+      "duration": 2
+    }
+  ]
+}
