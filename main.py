@@ -1,14 +1,39 @@
 import json
 import time
+import requests
 from datetime import datetime, timedelta
 
 from token_service import refresh, get_valid_token
 from slot_generator import generate_slots
 from booking import book_slots
 
+
+# 🔥 TELEGRAM CONFIG
+TELEGRAM_TOKEN = "8707541665:AAEmnzJqykk6YpzHkyDGp2TQRIcjPKcg5D4"
+CHAT_ID = "7106070066"
+
+
+def send_telegram(message):
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": CHAT_ID,
+        "text": message
+    }
+    try:
+        requests.post(url, json=payload, timeout=5)
+    except Exception as e:
+        print("Telegram error:", e)
+
+
+def log(msg):
+    print(msg)
+    send_telegram(msg)
+
+
 def parse_time(t):
     h, m, s = map(int, t.split(":"))
     return (h, m, s)
+
 
 with open("config.json") as f:
     config = json.load(f)
@@ -35,7 +60,7 @@ def wait_until(target_time):
     if now >= target:
         target += timedelta(days=1)
 
-    print(f"⏳ Wachten tot {target}")
+    log(f"⏳ Wachten tot {target}")
 
     while True:
         now = datetime.now()
@@ -49,14 +74,14 @@ def wait_until(target_time):
 
 
 def main():
-    print("🚀 Padel bot gestart")
+    log("🚀 Padel bot gestart")
 
     # 1. Wachten tot prep moment
-    print("⏳ Waiting for prep time...")
+    log("⏳ Waiting for prep time...")
     wait_until(PREP_TIME)
 
     # 2. Token refresh vlak voor booking
-    print("🔄 Token refresh net voor booking")
+    log("🔄 Token refresh net voor booking")
     refresh()
 
     token = get_valid_token()
@@ -67,31 +92,31 @@ def main():
 
     # 4. Slots genereren
     slots = generate_slots(config)
-    print("🎯 Slots:", slots)
+    log(f"🎯 Slots: {slots}")
 
     if not slots:
-        print("❌ Geen slots gegenereerd")
+        log("❌ Geen slots gegenereerd")
         return
 
     # 5. Wachten tot exact booking moment
-    print("⏳ Waiting for booking window...")
+    log("⏳ Waiting for booking window...")
     wait_until(BOOKING_TIME)
 
-    print("🚀 START BOOKING!")
+    log("🚀 START BOOKING!")
 
     # 6. Retry loop
     for i in range(10):
-        print(f"🔁 Attempt {i+1}")
+        log(f"🔁 Attempt {i+1}")
 
         success = book_slots(slots, config, token)
 
         if success:
-            print("🎉 Booking gelukt!")
+            log("🎉 Booking gelukt!")
             return
 
         time.sleep(0.3)
 
-    print("❌ Geen booking gelukt")
+    log("❌ Geen booking gelukt")
 
 
 if __name__ == "__main__":
