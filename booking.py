@@ -8,8 +8,8 @@ from booking import book_slots
 
 
 # 🔥 Test-instellingen
-PREP_TIME = (14, 39, 55)
-BOOKING_TIME = (14, 40, 0)
+PREP_TIME = (14, 49, 55)
+BOOKING_TIME = (14, 50, 0)
 
 
 def wait_until(target_time):
