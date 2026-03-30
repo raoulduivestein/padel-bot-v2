@@ -6,6 +6,9 @@ from token_service import refresh, get_valid_token
 from slot_generator import generate_slots
 from booking import book_slots
 
+def parse_time(t):
+    h, m, s = map(int, t.split(":"))
+    return (h, m, s)
 
 with open("config.json") as f:
     config = json.load(f)
