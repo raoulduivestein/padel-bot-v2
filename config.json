@@ -29,7 +29,7 @@
     },
     {
       "day": "wednesday",
-      "times": ["20:00"],
+      "times": ["20:00", "08:00"],
       "duration": 2
     },
     {
