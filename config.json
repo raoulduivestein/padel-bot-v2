@@ -1,7 +1,7 @@
 {
   "run_time": {
-    "prep": "15:26:55",
-    "booking": "15:27:00"
+    "prep": "07:59:55",
+    "booking": "08:00:00"
   },
 
   "club_id": 94,
@@ -10,7 +10,7 @@
   "members": [
     {
       "member_id": "bUpDTmkxR2kwMDZWNUk2SVQ5QithUQ==",
-      "name": "Raoul"
+      "name": "Marvin"
     },
     {
       "member_id": "ZktCelEvaGFZRStuaW9kNUE0cytpdw==",
@@ -29,17 +29,17 @@
     },
     {
       "day": "tuesday",
-      "times": ["20:00"],
+      "times": ["18:00"],
       "duration": 2
     },
     {
       "day": "wednesday",
-      "times": ["08:00"],
+      "times": ["18:00"],
       "duration": 2
     },
     {
       "day": "thursday",
-      "times": ["20:00"],
+      "times": ["18:00"],
       "duration": 2
     },
     {
@@ -49,6 +49,11 @@
     },
     {
       "day": "saturday",
+      "times": ["10:00"],
+      "duration": 2
+    },
+    {
+      "day": "sunday",
       "times": ["10:00"],
       "duration": 2
     }
