@@ -1,93 +1,154 @@
-import json
-import time
-from datetime import datetime, timedelta
+import requests
 
-from token_service import refresh, get_valid_token
-from slot_generator import generate_slots
-from booking import book_slots
+BASE_URL = "https://mobile-app-back.davidlloyd.co.uk"
 
 
-# 🔥 Test-instellingen
-PREP_TIME = (14, 49, 55)
-BOOKING_TIME = (14, 50, 0)
+# ─────────────────────────────────────────────
+# HEADERS
+# ─────────────────────────────────────────────
+def headers(token):
+    return {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0",
+        "X-App-Version": "149.0.0",
+        "X-Requested-With": "co.uk.davidlloyd.mobileapp",
+        "X-Auth-Token": token
+    }
 
 
-def wait_until(target_time):
-    """
-    Wacht tot een specifiek tijdstip.
-    Als dat tijdstip vandaag al voorbij is, wacht tot morgen.
-    """
-    now = datetime.now()
+# ─────────────────────────────────────────────
+# GET AVAILABILITY
+# ─────────────────────────────────────────────
+def get_availability(date, config, token, member):
+    url = f"{BASE_URL}/clubs/{config['club_id']}/court-slots/{date}/{config['sports_package_id']}"
 
-    target = now.replace(
-        hour=target_time[0],
-        minute=target_time[1],
-        second=target_time[2],
-        microsecond=0
+    params = {
+        "encodedContactId": member["member_id"]
+    }
+
+    r = requests.get(url, headers=headers(token), params=params)
+
+    print(f"📡 Availability status ({member['name']}): {r.status_code}")
+
+    if r.status_code != 200:
+        print("❌ Availability error:", r.text)
+        return None
+
+    data = r.json()
+    return data
+
+
+# ─────────────────────────────────────────────
+# SELECT COURT
+# ─────────────────────────────────────────────
+def select_court(data, target_time, config):
+    if not data:
+        return None
+
+    slots = data.get("slots", [])
+
+    available = [
+        slot["courtId"]
+        for slot in slots
+        if slot.get("startTime") == target_time
+    ]
+
+    print(f"🎾 Beschikbaar om {target_time}: {available}")
+
+    # 🎯 Preferred courts eerst
+    for preferred in config.get("preferred_courts", []):
+        if preferred in available:
+            print(f"🎯 Preferred court gekozen: {preferred}")
+            return preferred
+
+    # 🔁 fallback
+    if config.get("fallback_to_any") and available:
+        print(f"↪️ Fallback court: {available[0]}")
+        return available[0]
+
+    return None
+
+
+# ─────────────────────────────────────────────
+# TRY BOOK
+# ─────────────────────────────────────────────
+def try_book(slot, config, token, member):
+    print(f"👤 Booking met {member['name']} ({slot['time']})")
+
+    data = get_availability(slot["date"], config, token, member)
+
+    court_id = select_court(data, slot["time"], config)
+
+    if not court_id:
+        print("❌ Geen court beschikbaar")
+        return False
+
+    payload = {
+        "bookedMemberEncodedContactId": member["member_id"],
+        "courtId": court_id,
+        "date": slot["date"],
+        "startTime": slot["time"],
+        "sportsPackageId": config["sports_package_id"],
+        "playersEncodedContactIds": []
+    }
+
+    print("📤 CREATE PAYLOAD:", payload)
+
+    # ── CREATE ─────────────────────────────
+    r1 = requests.post(
+        f"{BASE_URL}/clubs/{config['club_id']}/bookings/court",
+        headers=headers(token),
+        json=payload
     )
 
-    # Alleen één keer bepalen of target naar morgen moet
-    if now >= target:
-        target += timedelta(days=1)
+    print("📤 CREATE status:", r1.status_code)
 
-    print(f"⏳ Wachten tot {target}")
+    if r1.status_code != 200:
+        print("❌ CREATE error:", r1.text)
+        return False
 
-    while True:
-        now = datetime.now()
-        seconds_to_wait = (target - now).total_seconds()
+    data = r1.json()
+    ref = data.get("encodedBookingReference")
 
-        if seconds_to_wait <= 0:
-            break
+    if not ref:
+        print("❌ Geen booking reference ontvangen")
+        return False
 
-        print(f"⏳ Nog {int(seconds_to_wait)} sec wachten...")
-        time.sleep(min(seconds_to_wait, 1))
+    # ── CONFIRM ────────────────────────────
+    r2 = requests.post(
+        f"{BASE_URL}/clubs/{config['club_id']}/members/me/bookings/{ref}/confirmCourt?return-booking=true",
+        headers=headers(token),
+        json={"courtConfirmationType": "provisional"}
+    )
+
+    print("📤 CONFIRM status:", r2.status_code)
+
+    if r2.status_code == 200:
+        print(f"✅ GEBOEKT {slot['time']} met {member['name']} (court {court_id})")
+        return True
+
+    print("❌ CONFIRM error:", r2.text)
+    return False
 
 
-def main():
-    print("🚀 Padel bot gestart")
+# ─────────────────────────────────────────────
+# MAIN BOOKING LOOP
+# ─────────────────────────────────────────────
+def book_slots(slots, config, token):
+    members = config["members"]
 
-    # 1. Wachten tot prep moment
-    print("⏳ Waiting for prep time...")
-    wait_until(PREP_TIME)
+    success_any = False
 
-    # 2. Token refresh vlak voor booking
-    print("🔄 Token refresh net voor booking")
-    refresh()
+    for i, slot in enumerate(slots):
+        member = members[i % len(members)]
 
-    token = get_valid_token()
-
-    # 3. Config laden
-    with open("config.json") as f:
-        config = json.load(f)
-
-    # 4. Slots genereren
-    slots = generate_slots(config)
-    print("🎯 Slots:", slots)
-
-    if not slots:
-        print("❌ Geen slots gegenereerd")
-        return
-
-    # 5. Wachten tot exact booking moment
-    print("⏳ Waiting for booking window...")
-    wait_until(BOOKING_TIME)
-
-    print("🚀 START BOOKING!")
-
-    # 6. Retry loop
-    for i in range(10):
-        print(f"🔁 Attempt {i+1}")
-
-        success = book_slots(slots, config, token)
+        success = try_book(slot, config, token, member)
 
         if success:
-            print("🎉 Booking gelukt!")
-            return
+            print(f"🎾 {slot['time']} geboekt met {member['name']}")
+            success_any = True
+        else:
+            print(f"⚠️ {slot['time']} niet gelukt")
 
-        time.sleep(0.3)
-
-    print("❌ Geen booking gelukt")
-
-
-if __name__ == "__main__":
-    main()
+    return success_any
