@@ -7,9 +7,11 @@ from slot_generator import generate_slots
 from booking import book_slots
 
 
-# 🔥 Test-instellingen
-PREP_TIME = (14, 52, 55)
-BOOKING_TIME = (14, 53, 0)
+with open("config.json") as f:
+    config = json.load(f)
+
+PREP_TIME = parse_time(config["run_time"]["prep"])
+BOOKING_TIME = parse_time(config["run_time"]["booking"])
 
 
 def wait_until(target_time):
