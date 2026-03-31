@@ -1,7 +1,7 @@
 import requests
 import json
 
-TELEGRAM_TOKEN = "JOUW_TOKEN"
+TELEGRAM_TOKEN = "8707541665:AAEmnzJqykk6YpzHkyDGp2TQRIcjPKcg5D4"
 CHAT_ID = 7106070066
 
 BASE_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
