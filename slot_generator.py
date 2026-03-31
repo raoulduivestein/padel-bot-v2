@@ -2,7 +2,9 @@ from datetime import datetime, timedelta
 
 def generate_slots(config):
     today = datetime.today()
-    target_date = today + timedelta(days=9)
+
+    # ✅ Gebruik config
+    target_date = today + timedelta(days=config["days_ahead"])
 
     weekday = target_date.strftime("%A").lower()
     slots = []
