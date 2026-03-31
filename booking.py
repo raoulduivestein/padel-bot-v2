@@ -1,4 +1,5 @@
 import requests
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 BASE_URL = "https://mobile-app-back.davidlloyd.co.uk"
 
@@ -35,8 +36,7 @@ def get_availability(date, config, token, member):
         print("❌ Availability error:", r.text)
         return None
 
-    data = r.json()
-    return data
+    return r.json()
 
 
 # ─────────────────────────────────────────────
@@ -77,11 +77,10 @@ def try_book(slot, config, token, member):
     print(f"👤 Booking met {member['name']} ({slot['time']})")
 
     data = get_availability(slot["date"], config, token, member)
-
     court_id = select_court(data, slot["time"], config)
 
     if not court_id:
-        print("❌ Geen court beschikbaar")
+        print(f"❌ Geen court beschikbaar ({slot['time']})")
         return False
 
     payload = {
@@ -102,7 +101,7 @@ def try_book(slot, config, token, member):
         json=payload
     )
 
-    print("📤 CREATE status:", r1.status_code)
+    print(f"📤 CREATE status ({slot['time']}):", r1.status_code)
 
     if r1.status_code != 200:
         print("❌ CREATE error:", r1.text)
@@ -122,7 +121,7 @@ def try_book(slot, config, token, member):
         json={"courtConfirmationType": "provisional"}
     )
 
-    print("📤 CONFIRM status:", r2.status_code)
+    print(f"📤 CONFIRM status ({slot['time']}):", r2.status_code)
 
     if r2.status_code == 200:
         print(f"✅ GEBOEKT {slot['time']} met {member['name']} (court {court_id})")
@@ -133,22 +132,39 @@ def try_book(slot, config, token, member):
 
 
 # ─────────────────────────────────────────────
-# MAIN BOOKING LOOP
+# MAIN BOOKING LOOP (PARALLEL)
 # ─────────────────────────────────────────────
 def book_slots(slots, config, token):
     members = config["members"]
 
+    # ❗ Check: genoeg members
+    if len(members) < len(slots):
+        print("❌ Niet genoeg members voor aantal slots")
+        return False
+
     success_any = False
 
+    # 🎯 Koppel unieke member per slot
+    tasks = []
     for i, slot in enumerate(slots):
-        member = members[i % len(members)]
+        member = members[i]
+        tasks.append((slot, member))
 
-        success = try_book(slot, config, token, member)
+    print(f"🚀 Start parallel booking ({len(tasks)} requests tegelijk)")
 
-        if success:
-            print(f"🎾 {slot['time']} geboekt met {member['name']}")
-            success_any = True
-        else:
-            print(f"⚠️ {slot['time']} niet gelukt")
+    # ⚡ Parallel uitvoeren
+    with ThreadPoolExecutor(max_workers=len(tasks)) as executor:
+        futures = [
+            executor.submit(try_book, slot, config, token, member)
+            for slot, member in tasks
+        ]
+
+        for future in as_completed(futures):
+            try:
+                success = future.result()
+                if success:
+                    success_any = True
+            except Exception as e:
+                print("❌ Thread error:", str(e))
 
     return success_any
