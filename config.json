@@ -39,12 +39,12 @@
     },
     {
       "day": "thursday",
-      "times": ["18:00"],
+      "times": ["19:00"],
       "duration": 2
     },
     {
       "day": "friday",
-      "times": ["21:00"],
+      "times": ["18:00"],
       "duration": 2
     },
     {
