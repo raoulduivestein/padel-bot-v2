@@ -1,10 +1,10 @@
 {
   "run_time": {
-    "prep": "09:07:55",
-    "booking": "09:08:00"
+    "prep": "07:59:55",
+    "booking": "08:00:00"
   },
 
-  "days_ahead": 7,
+  "days_ahead": 9,
 
   "club_id": 94,
   "sports_package_id": 63,
@@ -36,7 +36,7 @@
     },
     {
       "day": "wednesday",
-      "times": ["11:00"],
+      "times": ["18:00"],
       "duration": 2
     },
     {
