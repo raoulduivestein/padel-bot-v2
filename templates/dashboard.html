@@ -5,7 +5,6 @@
 
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 
 <style>
@@ -15,22 +14,34 @@ body {
 }
 
 .card {
-  border: none;
   border-radius: 16px;
+  border: none;
   box-shadow: 0 10px 30px rgba(0,0,0,0.08);
 }
 
-.btn {
+.form-control {
   border-radius: 10px;
+}
+
+.day-card {
+  background: #f9fafb;
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.day-header {
+  cursor: pointer;
+  font-weight: 600;
+  display: flex;
+  justify-content: space-between;
 }
 
 .toast-modern {
   border-radius: 12px;
-  padding: 12px 16px;
+  padding: 12px;
   color: white;
-  font-weight: 500;
   box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-  animation: slideIn 0.25s ease;
+  animation: slideIn 0.3s ease;
 }
 
 .toast-success { background: #28a745; }
@@ -49,9 +60,14 @@ body {
 
 <div class="container-fluid p-3">
 
-<div class="d-flex justify-content-between mb-3">
-  <h5>🎾 Padel Bot</h5>
+<!-- HEADER -->
+<div class="d-flex justify-content-between align-items-center mb-4">
   <div>
+    <h5 class="mb-0">🎾 Padel Bot</h5>
+    <small class="text-muted">Dashboard</small>
+  </div>
+
+  <div class="d-flex gap-2">
     <a href="/run_now" class="btn btn-success btn-sm">🚀 Run</a>
     <a href="/logout" class="btn btn-outline-danger btn-sm">Logout</a>
   </div>
@@ -59,32 +75,90 @@ body {
 
 <div class="row g-3">
 
+<!-- CONFIG -->
 <div class="col-12 col-lg-4">
   <div class="card p-3">
-    <form method="POST" action="/update_config">
-      <input name="days_ahead" class="form-control mb-2" value="{{ config.days_ahead }}">
-      <input name="prep" class="form-control mb-2" value="{{ config.run_time.prep }}">
-      <input name="booking" class="form-control mb-3" value="{{ config.run_time.booking }}">
+    
+    <h6 class="mb-3">⚙️ Config</h6>
 
-      {% for rule in config.booking_rules %}
-      <input name="times_{{ loop.index0 }}" class="form-control mb-1" value="{{ rule.times | join(',') }}">
-      <input name="duration_{{ loop.index0 }}" class="form-control mb-2" value="{{ rule.duration }}">
+    <form method="POST" action="/update_config">
+
+      <label class="form-label">Days Ahead</label>
+      <input name="days_ahead" class="form-control mb-2" value="{{ config.days_ahead }}">
+
+      <label class="form-label">Prep Time</label>
+      <input type="time" name="prep" class="form-control mb-2" value="{{ config.run_time.prep }}">
+
+      <label class="form-label">Booking Time</label>
+      <input type="time" name="booking" class="form-control mb-3" value="{{ config.run_time.booking }}">
+
+      <hr>
+
+      <h6 class="mb-2">📅 Speelmomenten</h6>
+
+      {% set order = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'] %}
+
+      {% for day in order %}
+        {% for rule in config.booking_rules if rule.day == day %}
+
+        <div class="day-card mb-2">
+
+          <div class="day-header" onclick="toggleDay('{{ loop.index0 }}')">
+            <span class="text-capitalize">{{ rule.day }}</span>
+            <span id="icon-{{ loop.index0 }}">▼</span>
+          </div>
+
+          <div id="day-{{ loop.index0 }}" class="mt-2">
+
+            <div class="row g-2">
+
+              <!-- TIME -->
+              <div class="col-6">
+                <label class="small">Start tijd</label>
+                <input type="time"
+                       name="times_{{ loop.index0 }}"
+                       class="form-control"
+                       value="{{ rule.times[0] }}">
+              </div>
+
+              <!-- DURATION -->
+              <div class="col-6">
+                <label class="small">Duur (uur)</label>
+                <input type="number"
+                       name="duration_{{ loop.index0 }}"
+                       class="form-control"
+                       value="{{ rule.duration }}">
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+        {% endfor %}
       {% endfor %}
 
-      <button class="btn btn-dark w-100">Opslaan</button>
+      <button class="btn btn-dark w-100 mt-2">💾 Opslaan</button>
+
     </form>
+
   </div>
 </div>
 
+<!-- STATS -->
 <div class="col-12 col-lg-4">
   <div class="card p-3">
+    <h6 class="mb-3">📊 Statistieken</h6>
     <canvas id="chart"></canvas>
     <div id="statusList" class="mt-3 small"></div>
   </div>
 </div>
 
+<!-- LOGS -->
 <div class="col-12 col-lg-4">
   <div class="card p-3">
+    <h6 class="mb-3">📄 Logs</h6>
     <select id="logSelect" class="form-select mb-2"></select>
     <div id="liveLog" class="bg-black text-success p-2 rounded small" style="height:300px; overflow:auto;"></div>
   </div>
@@ -97,130 +171,18 @@ body {
 <div id="toastContainer" class="position-fixed bottom-0 end-0 p-3"></div>
 
 <script>
-let chart
-let currentSelected = null
+function toggleDay(i) {
+  const el = document.getElementById("day-"+i)
+  const icon = document.getElementById("icon-"+i)
 
-// 🔥 FIX: persistente status
-let lastStatus = JSON.parse(localStorage.getItem("lastStatus") || "{}")
-
-function showToast(message, type="info") {
-  const map = {
-    success: "toast-success",
-    failed: "toast-error",
-    running: "toast-running"
-  }
-
-  const toast = document.createElement("div")
-  toast.className = `toast-modern ${map[type] || ""} mb-2`
-  toast.innerHTML = message
-
-  document.getElementById("toastContainer").appendChild(toast)
-
-  setTimeout(() => toast.remove(), 4000)
-}
-
-async function loadStatus() {
-  const res = await fetch("/api/status")
-  const data = await res.json()
-
-  let success = 0, failed = 0, running = 0
-
-  let html = ""
-  let dropdown = ""
-
-  data.forEach(r => {
-
-    if (r.status === "success") success++
-    if (r.status === "failed") failed++
-    if (r.status === "running") running++
-
-    // 🔥 FIX: alleen nieuwe of veranderde status
-    if (!lastStatus[r.file]) {
-      if (r.status === "running") showToast("🚀 Run gestart", "running")
-      if (r.status === "success") showToast("✅ Run succesvol", "success")
-      if (r.status === "failed") showToast("❌ Run gefaald", "failed")
-    }
-    else if (lastStatus[r.file] !== r.status) {
-      if (r.status === "success") showToast("✅ Run succesvol", "success")
-      if (r.status === "failed") showToast("❌ Run gefaald", "failed")
-    }
-
-    lastStatus[r.file] = r.status
-
-    html += `<div>${r.file} (${r.status})</div>`
-    dropdown += `<option value="${r.file}">${r.file}</option>`
-  })
-
-  // 🔥 opslaan
-  localStorage.setItem("lastStatus", JSON.stringify(lastStatus))
-
-  document.getElementById("statusList").innerHTML = html
-
-  const select = document.getElementById("logSelect")
-  const prev = select.value
-
-  select.innerHTML = dropdown
-
-  if (data.length > 0) {
-    const newest = data[0].file
-    if (!prev || currentSelected !== newest) {
-      select.value = newest
-      currentSelected = newest
-    }
-  }
-
-  updateChart(success, failed, running)
-}
-
-function updateChart(success, failed, running) {
-  const total = success + failed + running
-
-  const labels = [
-    `Success (${percent(success,total)}%)`,
-    `Failed (${percent(failed,total)}%)`,
-    `Running (${percent(running,total)}%)`
-  ]
-
-  const dataValues = [success, failed, running]
-
-  if (!chart) {
-    chart = new Chart(document.getElementById("chart"), {
-      type: "doughnut",
-      data: {
-        labels,
-        datasets: [{
-          data: dataValues,
-          backgroundColor: ["#28a745","#dc3545","#ffc107"]
-        }]
-      }
-    })
+  if (el.style.display === "none") {
+    el.style.display = "block"
+    icon.innerText = "▼"
   } else {
-    chart.data.labels = labels
-    chart.data.datasets[0].data = dataValues
-    chart.update()
+    el.style.display = "none"
+    icon.innerText = "▶"
   }
 }
-
-function percent(v,t){ return t===0?0:Math.round((v/t)*100) }
-
-async function loadLog() {
-  const file = document.getElementById("logSelect").value
-  if (!file) return
-
-  const res = await fetch(`/api/log/${file}`)
-  const data = await res.json()
-
-  const el = document.getElementById("liveLog")
-  el.innerHTML = data.lines.map(l => `<div>${l}</div>`).join("")
-  el.scrollTop = el.scrollHeight
-}
-
-setInterval(() => {
-  loadStatus()
-  loadLog()
-}, 2000)
-
-loadStatus()
 </script>
 
 </body>
