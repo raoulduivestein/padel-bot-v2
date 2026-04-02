@@ -1,54 +1,26 @@
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
 
-<canvas id="chart"></canvas>
+<body class="bg-dark text-light">
 
-<div id="statusList"></div>
+<div class="container-fluid p-3">
 
-<select id="logSelect">
-  {% for log in logs %}
-  <option value="{{ log }}">{{ log }}</option>
+<div class="d-flex justify-content-between mb-3">
+  <h6 class="mb-0">{{ filename }}</h6>
+  <a href="/dashboard" class="btn btn-sm btn-light">Back</a>
+</div>
+
+<div class="bg-black p-2 rounded small" style="height:70vh; overflow:auto;">
+  {% for line in content %}
+    <div>{{ line }}</div>
   {% endfor %}
-</select>
+</div>
 
-<div id="liveLog"></div>
+</div>
 
-<script>
-let chart
-
-async function loadStatus() {
-  const res = await fetch("/api/status")
-  const data = await res.json()
-
-  let success = 0, failed = 0
-
-  data.forEach(r => {
-    if (r.status === "success") success++
-    if (r.status === "failed") failed++
-  })
-
-  if (!chart) {
-    chart = new Chart(document.getElementById('chart'), {
-      type: 'doughnut',
-      data: {
-        labels: ['Success','Failed'],
-        datasets: [{data:[success,failed]}]
-      }
-    })
-  } else {
-    chart.data.datasets[0].data = [success, failed]
-    chart.update()
-  }
-}
-
-async function loadLog() {
-  const file = document.getElementById("logSelect").value
-  const res = await fetch(`/api/log/${file}`)
-  const data = await res.json()
-
-  document.getElementById("liveLog").innerHTML =
-    data.lines.map(l => `<div>${l}</div>`).join("")
-}
-
-setInterval(loadStatus, 2000)
-setInterval(loadLog, 2000)
-</script>
+</body>
+</html>
