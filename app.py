@@ -77,13 +77,37 @@ def api_log(filename):
 
 @app.route("/update_config", methods=["POST"])
 def update_config():
+    if not session.get("logged_in"):
+        return redirect("/")
+
     cfg = load_config()
 
+    # ─────────────────────────
+    # BASIC SETTINGS
+    # ─────────────────────────
     cfg["days_ahead"] = int(request.form["days_ahead"])
     cfg["run_time"]["prep"] = request.form["prep"]
     cfg["run_time"]["booking"] = request.form["booking"]
 
+    # ─────────────────────────
+    # BOOKING RULES (🔥 FIX)
+    # ─────────────────────────
+    for i, rule in enumerate(cfg["booking_rules"]):
+        times_raw = request.form.get(f"times_{i}", "")
+        
+        cfg["booking_rules"][i]["times"] = [
+            t.strip() for t in times_raw.split(",") if t.strip()
+        ]
+
+        cfg["booking_rules"][i]["duration"] = int(
+            request.form.get(f"duration_{i}", 1)
+        )
+
+    # ─────────────────────────
+    # SAVE
+    # ─────────────────────────
     save_config(cfg)
+
     return redirect("/dashboard")
 
 
