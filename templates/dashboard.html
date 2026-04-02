@@ -39,7 +39,34 @@
         <label class="form-label">Booking</label>
         <input name="booking" class="form-control mb-3" value="{{ config.run_time.booking }}">
 
-        <button class="btn btn-dark w-100">💾 Opslaan</button>
+        <hr>
+
+        <h6>📅 Booking Rules</h6>
+
+        {% for rule in config.booking_rules %}
+        <div class="border rounded p-2 mb-2">
+
+          <div class="fw-bold text-capitalize">{{ rule.day }}</div>
+
+          <label class="small">Times</label>
+          <input
+            name="times_{{ loop.index0 }}"
+            class="form-control mb-1"
+            value="{{ rule.times | join(',') }}"
+            placeholder="18:00,19:00"
+          >
+
+          <label class="small">Duration (uren)</label>
+          <input
+            name="duration_{{ loop.index0 }}"
+            class="form-control"
+            value="{{ rule.duration }}"
+          >
+
+        </div>
+        {% endfor %}
+
+        <button class="btn btn-dark w-100 mt-2">💾 Opslaan</button>
 
       </form>
 
