@@ -92,9 +92,28 @@
 
 </div>
 
+<!-- TOAST -->
+<div id="toastContainer" class="position-fixed bottom-0 end-0 p-3" style="z-index:9999"></div>
+
 <script>
 let chart
 let currentSelected = null
+let lastStatus = {}
+
+function showToast(message, type="info") {
+  const colors = {
+    success: "bg-success",
+    failed: "bg-danger",
+    running: "bg-warning text-dark"
+  }
+
+  const toast = document.createElement("div")
+  toast.className = `toast ${colors[type]} text-white p-2 mb-2`
+  toast.innerHTML = message
+
+  document.getElementById("toastContainer").appendChild(toast)
+  setTimeout(() => toast.remove(), 4000)
+}
 
 async function loadStatus() {
   const res = await fetch("/api/status")
@@ -102,22 +121,36 @@ async function loadStatus() {
 
   let success = 0
   let failed = 0
+  let running = 0
 
   let html = ""
   let dropdown = ""
 
-  data.forEach((r, index) => {
+  data.forEach(r => {
 
     if (r.status === "success") success++
     if (r.status === "failed") failed++
+    if (r.status === "running") running++
+
+    // popup detectie
+    if (lastStatus[r.file] && lastStatus[r.file] !== r.status) {
+      if (r.status === "success") showToast(`✅ ${r.file} gelukt`, "success")
+      if (r.status === "failed") showToast(`❌ ${r.file} gefaald`, "failed")
+    }
+
+    if (!lastStatus[r.file] && r.status === "running") {
+      showToast(`🚀 Run gestart`, "running")
+    }
+
+    lastStatus[r.file] = r.status
 
     const color =
       r.status === "success" ? "green" :
-      r.status === "failed" ? "red" : "gray"
+      r.status === "failed" ? "red" :
+      "orange"
 
     html += `
-      <div style="cursor:pointer"
-           onclick="openLog('${r.file}')">
+      <div onclick="openLog('${r.file}')" style="cursor:pointer">
         ${r.file}
         <span style="color:${color}">
           ● ${r.status}
@@ -139,45 +172,60 @@ async function loadStatus() {
 
   select.innerHTML = dropdown
 
-  // 🔥 NIEUW: detecteer nieuwe run
   if (data.length > 0) {
     const newest = data[0].file
 
-    // als huidige selectie niet bestaat of nieuwe run
-    if (!prev || !data.find(d => d.file === prev)) {
-      select.value = newest
-      currentSelected = newest
-    }
-
-    // 🔥 als er een NIEUWE run is → auto selecteren
-    if (currentSelected !== newest) {
+    if (!prev || currentSelected !== newest) {
       select.value = newest
       currentSelected = newest
     }
   }
 
-  updateChart(success, failed)
+  updateChart(success, failed, running)
 }
 
 function openLog(file) {
   window.location.href = "/log/" + file
 }
 
-function updateChart(success, failed) {
-  const ctx = document.getElementById('chart')
+function updateChart(success, failed, running) {
+  const total = success + failed + running
+
+  const dataValues = [success, failed, running]
+
+  const labels = [
+    `Success (${percentage(success, total)}%)`,
+    `Failed (${percentage(failed, total)}%)`,
+    `Running (${percentage(running, total)}%)`
+  ]
+
+  const colors = [
+    "#28a745", // groen
+    "#dc3545", // rood
+    "#ffc107"  // geel
+  ]
 
   if (!chart) {
-    chart = new Chart(ctx, {
+    chart = new Chart(document.getElementById('chart'), {
       type: 'doughnut',
       data: {
-        labels: ['Success','Failed'],
-        datasets: [{ data:[success,failed] }]
+        labels: labels,
+        datasets: [{
+          data: dataValues,
+          backgroundColor: colors
+        }]
       }
     })
   } else {
-    chart.data.datasets[0].data = [success, failed]
+    chart.data.labels = labels
+    chart.data.datasets[0].data = dataValues
     chart.update()
   }
+}
+
+function percentage(value, total) {
+  if (total === 0) return 0
+  return Math.round((value / total) * 100)
 }
 
 async function loadLog() {
@@ -187,17 +235,17 @@ async function loadLog() {
   const res = await fetch(`/api/log/${file}`)
   const data = await res.json()
 
-  document.getElementById("liveLog").innerHTML =
-    data.lines.map(l => `<div>${l}</div>`).join("")
+  const el = document.getElementById("liveLog")
+
+  el.innerHTML = data.lines.map(l => `<div>${l}</div>`).join("")
+  el.scrollTop = el.scrollHeight
 }
 
-// 🔄 refresh
 setInterval(() => {
   loadStatus()
   loadLog()
 }, 2000)
 
-// initial load
 loadStatus()
 setTimeout(loadLog, 500)
 </script>
