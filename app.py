@@ -78,11 +78,18 @@ def run_now():
     if not session.get("logged_in"):
         return redirect("/")
 
-    subprocess.Popen([
-        "/root/padel-bot-v2/venv/bin/python",
-        "main.py",
-        "run_now"
-    ])
+    BASE_DIR = "/root/padel-bot-v2"
+
+    try:
+        subprocess.Popen(
+            [f"{BASE_DIR}/venv/bin/python", f"{BASE_DIR}/main.py", "run_now"],
+            cwd=BASE_DIR,
+            stdout=open(f"{BASE_DIR}/logs/run_now_debug.log", "a"),
+            stderr=open(f"{BASE_DIR}/logs/run_now_debug.log", "a")
+        )
+
+    except Exception as e:
+        print("ERROR STARTING RUN:", e)
 
     return redirect("/dashboard")
 
