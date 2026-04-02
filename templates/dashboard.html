@@ -83,14 +83,25 @@ body {
 
     <form method="POST" action="/update_config">
 
-      <label class="form-label">Days Ahead</label>
-      <input name="days_ahead" class="form-control mb-2" value="{{ config.days_ahead }}">
+      <!-- 🔥 COMPACT CONFIG -->
+      <div class="row g-2 mb-3">
 
-      <label class="form-label">Prep Time</label>
-      <input type="time" name="prep" class="form-control mb-2" value="{{ config.run_time.prep }}">
+        <div class="col-4">
+          <label class="small">Days</label>
+          <input name="days_ahead" class="form-control" value="{{ config.days_ahead }}">
+        </div>
 
-      <label class="form-label">Booking Time</label>
-      <input type="time" name="booking" class="form-control mb-3" value="{{ config.run_time.booking }}">
+        <div class="col-4">
+          <label class="small">Prep</label>
+          <input type="time" name="prep" class="form-control" value="{{ config.run_time.prep }}">
+        </div>
+
+        <div class="col-4">
+          <label class="small">Book</label>
+          <input type="time" name="booking" class="form-control" value="{{ config.run_time.booking }}">
+        </div>
+
+      </div>
 
       <hr>
 
@@ -107,15 +118,16 @@ body {
 
             <div class="day-header" onclick="toggleDay('{{ idx.value }}')">
               <span class="text-capitalize">{{ rule.day }}</span>
-              <span id="icon-{{ idx.value }}">▼</span>
+              <span id="icon-{{ idx.value }}">▶</span>
             </div>
 
-            <div id="day-{{ idx.value }}" class="mt-2">
+            <!-- 🔥 STANDAARD DICHT -->
+            <div id="day-{{ idx.value }}" class="mt-2" style="display:none;">
 
               <div class="row g-2">
 
                 <div class="col-6">
-                  <label class="small">Start tijd</label>
+                  <label class="small">Start</label>
                   <input type="time"
                          name="times_{{ idx.value }}"
                          class="form-control"
@@ -123,7 +135,7 @@ body {
                 </div>
 
                 <div class="col-6">
-                  <label class="small">Duur (uur)</label>
+                  <label class="small">Uur</label>
                   <input type="number"
                          name="duration_{{ idx.value }}"
                          class="form-control"
@@ -199,9 +211,7 @@ async function loadStatus() {
   const data = await res.json()
 
   let success = 0, failed = 0, running = 0
-
-  let html = ""
-  let dropdown = ""
+  let html = "", dropdown = ""
 
   data.forEach(r => {
 
