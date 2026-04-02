@@ -97,45 +97,48 @@ body {
       <h6 class="mb-2">📅 Speelmomenten</h6>
 
       {% set order = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'] %}
+      {% set idx = namespace(value=0) %}
 
       {% for day in order %}
-        {% for rule in config.booking_rules if rule.day == day %}
+        {% for rule in config.booking_rules %}
+          {% if rule.day == day %}
 
-        <div class="day-card mb-2">
+          <div class="day-card mb-2">
 
-          <div class="day-header" onclick="toggleDay('{{ loop.index0 }}')">
-            <span class="text-capitalize">{{ rule.day }}</span>
-            <span id="icon-{{ loop.index0 }}">▼</span>
-          </div>
+            <div class="day-header" onclick="toggleDay('{{ idx.value }}')">
+              <span class="text-capitalize">{{ rule.day }}</span>
+              <span id="icon-{{ idx.value }}">▼</span>
+            </div>
 
-          <div id="day-{{ loop.index0 }}" class="mt-2">
+            <div id="day-{{ idx.value }}" class="mt-2">
 
-            <div class="row g-2">
+              <div class="row g-2">
 
-              <!-- TIME -->
-              <div class="col-6">
-                <label class="small">Start tijd</label>
-                <input type="time"
-                       name="times_{{ loop.index0 }}"
-                       class="form-control"
-                       value="{{ rule.times[0] }}">
-              </div>
+                <div class="col-6">
+                  <label class="small">Start tijd</label>
+                  <input type="time"
+                         name="times_{{ idx.value }}"
+                         class="form-control"
+                         value="{{ rule.times[0] }}">
+                </div>
 
-              <!-- DURATION -->
-              <div class="col-6">
-                <label class="small">Duur (uur)</label>
-                <input type="number"
-                       name="duration_{{ loop.index0 }}"
-                       class="form-control"
-                       value="{{ rule.duration }}">
+                <div class="col-6">
+                  <label class="small">Duur (uur)</label>
+                  <input type="number"
+                         name="duration_{{ idx.value }}"
+                         class="form-control"
+                         value="{{ rule.duration }}">
+                </div>
+
               </div>
 
             </div>
 
           </div>
 
-        </div>
+          {% set idx.value = idx.value + 1 %}
 
+          {% endif %}
         {% endfor %}
       {% endfor %}
 
@@ -168,9 +171,123 @@ body {
 
 </div>
 
+<!-- TOAST -->
 <div id="toastContainer" class="position-fixed bottom-0 end-0 p-3"></div>
 
 <script>
+let chart
+let currentSelected = null
+let lastStatus = JSON.parse(localStorage.getItem("lastStatus") || "{}")
+
+function showToast(message, type="info") {
+  const map = {
+    success: "toast-success",
+    failed: "toast-error",
+    running: "toast-running"
+  }
+
+  const toast = document.createElement("div")
+  toast.className = `toast-modern ${map[type] || ""} mb-2`
+  toast.innerHTML = message
+
+  document.getElementById("toastContainer").appendChild(toast)
+  setTimeout(() => toast.remove(), 4000)
+}
+
+async function loadStatus() {
+  const res = await fetch("/api/status")
+  const data = await res.json()
+
+  let success = 0, failed = 0, running = 0
+
+  let html = ""
+  let dropdown = ""
+
+  data.forEach(r => {
+
+    if (r.status === "success") success++
+    if (r.status === "failed") failed++
+    if (r.status === "running") running++
+
+    if (!lastStatus[r.file]) {
+      if (r.status === "running") showToast("🚀 Run gestart", "running")
+      if (r.status === "success") showToast("✅ Run succesvol", "success")
+      if (r.status === "failed") showToast("❌ Run gefaald", "failed")
+    }
+    else if (lastStatus[r.file] !== r.status) {
+      if (r.status === "success") showToast("✅ Run succesvol", "success")
+      if (r.status === "failed") showToast("❌ Run gefaald", "failed")
+    }
+
+    lastStatus[r.file] = r.status
+
+    html += `<div>${r.file} (${r.status})</div>`
+    dropdown += `<option value="${r.file}">${r.file}</option>`
+  })
+
+  localStorage.setItem("lastStatus", JSON.stringify(lastStatus))
+
+  document.getElementById("statusList").innerHTML = html
+
+  const select = document.getElementById("logSelect")
+  const prev = select.value
+
+  select.innerHTML = dropdown
+
+  if (data.length > 0) {
+    const newest = data[0].file
+    if (!prev || currentSelected !== newest) {
+      select.value = newest
+      currentSelected = newest
+    }
+  }
+
+  updateChart(success, failed, running)
+}
+
+function updateChart(success, failed, running) {
+  const total = success + failed + running
+
+  const labels = [
+    `Success (${percent(success,total)}%)`,
+    `Failed (${percent(failed,total)}%)`,
+    `Running (${percent(running,total)}%)`
+  ]
+
+  const dataValues = [success, failed, running]
+
+  if (!chart) {
+    chart = new Chart(document.getElementById("chart"), {
+      type: "doughnut",
+      data: {
+        labels,
+        datasets: [{
+          data: dataValues,
+          backgroundColor: ["#28a745","#dc3545","#ffc107"]
+        }]
+      }
+    })
+  } else {
+    chart.data.labels = labels
+    chart.data.datasets[0].data = dataValues
+    chart.update()
+  }
+}
+
+function percent(v,t){ return t===0?0:Math.round((v/t)*100) }
+
+async function loadLog() {
+  const file = document.getElementById("logSelect").value
+  if (!file) return
+
+  const res = await fetch(`/api/log/${file}`)
+  const data = await res.json()
+
+  const el = document.getElementById("liveLog")
+  el.innerHTML = data.lines.map(l => `<div>${l}</div>`).join("")
+  el.scrollTop = el.scrollHeight
+}
+
 function toggleDay(i) {
   const el = document.getElementById("day-"+i)
   const icon = document.getElementById("icon-"+i)
@@ -183,6 +300,13 @@ function toggleDay(i) {
     icon.innerText = "▶"
   }
 }
+
+setInterval(() => {
+  loadStatus()
+  loadLog()
+}, 2000)
+
+loadStatus()
 </script>
 
 </body>
