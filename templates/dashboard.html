@@ -1,106 +1,54 @@
-<!DOCTYPE html>
-<html>
-<head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
+<canvas id="chart"></canvas>
 
-<body class="bg-light">
+<div id="statusList"></div>
 
-<div class="container-fluid p-3">
+<select id="logSelect">
+  {% for log in logs %}
+  <option value="{{ log }}">{{ log }}</option>
+  {% endfor %}
+</select>
 
-<!-- HEADER -->
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h5 class="mb-0">Padel Bot</h5>
-  <a href="/logout" class="btn btn-sm btn-outline-danger">Logout</a>
-</div>
+<div id="liveLog"></div>
 
-<!-- RUN NOW BUTTON -->
-<a href="/run_now" class="btn btn-success w-100 mb-3">
-  🚀 Run Now
-</a>
+<script>
+let chart
 
-<div class="row g-3">
+async function loadStatus() {
+  const res = await fetch("/api/status")
+  const data = await res.json()
 
-<!-- CONFIG -->
-<div class="col-12 col-lg-6">
-  <div class="card shadow-sm">
-    <div class="card-header">⚙️ Config</div>
+  let success = 0, failed = 0
 
-    <div class="card-body">
+  data.forEach(r => {
+    if (r.status === "success") success++
+    if (r.status === "failed") failed++
+  })
 
-      <form method="POST" action="/update_config">
+  if (!chart) {
+    chart = new Chart(document.getElementById('chart'), {
+      type: 'doughnut',
+      data: {
+        labels: ['Success','Failed'],
+        datasets: [{data:[success,failed]}]
+      }
+    })
+  } else {
+    chart.data.datasets[0].data = [success, failed]
+    chart.update()
+  }
+}
 
-        <label class="form-label">Days Ahead</label>
-        <input name="days_ahead" class="form-control mb-3" value="{{ config.days_ahead }}">
+async function loadLog() {
+  const file = document.getElementById("logSelect").value
+  const res = await fetch(`/api/log/${file}`)
+  const data = await res.json()
 
-        <div class="row">
-          <div class="col-6">
-            <label class="form-label">Prep</label>
-            <input name="prep" class="form-control mb-3" value="{{ config.run_time.prep }}">
-          </div>
+  document.getElementById("liveLog").innerHTML =
+    data.lines.map(l => `<div>${l}</div>`).join("")
+}
 
-          <div class="col-6">
-            <label class="form-label">Booking</label>
-            <input name="booking" class="form-control mb-3" value="{{ config.run_time.booking }}">
-          </div>
-        </div>
-
-        <hr>
-
-        <h6>📅 Booking Rules</h6>
-
-        {% for rule in config.booking_rules %}
-        <div class="border rounded p-2 mb-2">
-
-          <strong>{{ rule.day }}</strong>
-
-          <input
-            name="times_{{ loop.index0 }}"
-            class="form-control mt-1"
-            value="{{ rule.times | join(',') }}"
-          >
-
-          <input
-            name="duration_{{ loop.index0 }}"
-            class="form-control mt-1"
-            value="{{ rule.duration }}"
-          >
-
-        </div>
-        {% endfor %}
-
-        <button class="btn btn-dark w-100 mt-2">💾 Opslaan</button>
-
-      </form>
-
-    </div>
-  </div>
-</div>
-
-<!-- LOGS -->
-<div class="col-12 col-lg-6">
-  <div class="card shadow-sm">
-    <div class="card-header">📄 Runs</div>
-
-    <div class="list-group list-group-flush">
-
-      {% for log in logs %}
-      <a href="/log/{{ log }}" class="list-group-item list-group-item-action d-flex justify-content-between">
-        <span>{{ log }}</span>
-        <span>➡️</span>
-      </a>
-      {% endfor %}
-
-    </div>
-
-  </div>
-</div>
-
-</div>
-
-</div>
-
-</body>
-</html>
+setInterval(loadStatus, 2000)
+setInterval(loadLog, 2000)
+</script>
