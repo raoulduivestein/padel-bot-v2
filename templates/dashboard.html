@@ -5,268 +5,193 @@
 
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+body {
+  font-family: 'Inter', sans-serif;
+  background: linear-gradient(135deg, #f5f7fa, #e4ecf3);
+}
+
+.card {
+  border: none;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+}
+
+.btn {
+  border-radius: 10px;
+}
+
+.toast-modern {
+  border-radius: 12px;
+  padding: 12px 16px;
+  color: white;
+  font-weight: 500;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+  animation: slideIn 0.25s ease;
+}
+
+.toast-success { background: #28a745; }
+.toast-error   { background: #dc3545; }
+.toast-running { background: #ffc107; color:black; }
+
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity:0 }
+  to   { transform: translateX(0); opacity:1 }
+}
+</style>
+
 </head>
 
-<body class="bg-light">
+<body>
 
 <div class="container-fluid p-3">
 
-  <div class="d-flex justify-content-between mb-3">
-    <h5>🎾 Padel Bot</h5>
-    <div>
-      <a href="/run_now" class="btn btn-success btn-sm">🚀 Run Now</a>
-      <a href="/logout" class="btn btn-outline-danger btn-sm">Logout</a>
-    </div>
+<div class="d-flex justify-content-between mb-3">
+  <h5>🎾 Padel Bot</h5>
+  <div>
+    <a href="/run_now" class="btn btn-success btn-sm">🚀 Run</a>
+    <a href="/logout" class="btn btn-outline-danger btn-sm">Logout</a>
   </div>
+</div>
 
-  <div class="row g-3">
+<div class="row g-3">
 
-    <div class="col-12 col-lg-4">
-      <div class="card shadow-sm">
-        <div class="card-header">⚙️ Config</div>
-        <div class="card-body">
+<div class="col-12 col-lg-4">
+  <div class="card p-3">
+    <form method="POST" action="/update_config">
+      <input name="days_ahead" class="form-control mb-2" value="{{ config.days_ahead }}">
+      <input name="prep" class="form-control mb-2" value="{{ config.run_time.prep }}">
+      <input name="booking" class="form-control mb-3" value="{{ config.run_time.booking }}">
 
-          <form method="POST" action="/update_config">
+      {% for rule in config.booking_rules %}
+      <input name="times_{{ loop.index0 }}" class="form-control mb-1" value="{{ rule.times | join(',') }}">
+      <input name="duration_{{ loop.index0 }}" class="form-control mb-2" value="{{ rule.duration }}">
+      {% endfor %}
 
-            <label class="form-label">Days Ahead</label>
-            <input name="days_ahead" class="form-control mb-2" value="{{ config.days_ahead }}">
-
-            <label class="form-label">Prep</label>
-            <input name="prep" class="form-control mb-2" value="{{ config.run_time.prep }}">
-
-            <label class="form-label">Booking</label>
-            <input name="booking" class="form-control mb-3" value="{{ config.run_time.booking }}">
-
-            <hr>
-
-            {% for rule in config.booking_rules %}
-            <div class="mb-2">
-              <strong>{{ rule.day }}</strong>
-
-              <input name="times_{{ loop.index0 }}"
-                     class="form-control mb-1"
-                     value="{{ rule.times | join(',') }}"
-                     placeholder="18:00,19:00">
-
-              <input name="duration_{{ loop.index0 }}"
-                     class="form-control"
-                     value="{{ rule.duration }}"
-                     placeholder="Duration">
-            </div>
-            {% endfor %}
-
-            <button class="btn btn-dark w-100">💾 Opslaan</button>
-
-          </form>
-
-        </div>
-      </div>
-    </div>
-
-    <div class="col-12 col-lg-4">
-      <div class="card shadow-sm">
-        <div class="card-header">📊 Status</div>
-        <div class="card-body">
-
-          <canvas id="chart"></canvas>
-
-          <div id="statusList" class="mt-3 small"></div>
-
-        </div>
-      </div>
-    </div>
-
-    <div class="col-12 col-lg-4">
-      <div class="card shadow-sm">
-        <div class="card-header">🔄 Live Logs</div>
-        <div class="card-body">
-
-          <select id="logSelect" class="form-select mb-2"></select>
-
-          <div id="liveLog"
-               class="bg-black text-success p-2 rounded small"
-               style="height:300px; overflow:auto;">
-          </div>
-
-        </div>
-      </div>
-    </div>
-
+      <button class="btn btn-dark w-100">Opslaan</button>
+    </form>
   </div>
+</div>
+
+<div class="col-12 col-lg-4">
+  <div class="card p-3">
+    <canvas id="chart"></canvas>
+    <div id="statusList" class="mt-3 small"></div>
+  </div>
+</div>
+
+<div class="col-12 col-lg-4">
+  <div class="card p-3">
+    <select id="logSelect" class="form-select mb-2"></select>
+    <div id="liveLog" class="bg-black text-success p-2 rounded small" style="height:300px; overflow:auto;"></div>
+  </div>
+</div>
 
 </div>
 
-<div id="toastContainer"
-     class="position-fixed bottom-0 end-0 p-3"
-     style="z-index:9999; max-width: 360px;">
 </div>
+
+<div id="toastContainer" class="position-fixed bottom-0 end-0 p-3"></div>
 
 <script>
 let chart
 let currentSelected = null
-let lastStatus = {}
 
-function escapeHtml(text) {
-  const div = document.createElement("div")
-  div.innerText = text
-  return div.innerHTML
-}
+// 🔥 FIX: persistente status
+let lastStatus = JSON.parse(localStorage.getItem("lastStatus") || "{}")
 
-function showToast(message, type = "info") {
-  const colors = {
-    success: "bg-success text-white",
-    failed: "bg-danger text-white",
-    running: "bg-warning text-dark",
-    info: "bg-secondary text-white"
+function showToast(message, type="info") {
+  const map = {
+    success: "toast-success",
+    failed: "toast-error",
+    running: "toast-running"
   }
 
   const toast = document.createElement("div")
-  toast.className = `shadow rounded p-3 mb-2 ${colors[type] || colors.info}`
-  toast.style.opacity = "0"
-  toast.style.transform = "translateY(10px)"
-  toast.style.transition = "all 0.25s ease"
+  toast.className = `toast-modern ${map[type] || ""} mb-2`
+  toast.innerHTML = message
 
-  toast.innerHTML = `
-    <div class="d-flex justify-content-between align-items-start gap-3">
-      <div>${escapeHtml(message)}</div>
-      <button type="button" class="btn-close ${type === 'running' ? '' : 'btn-close-white'}"></button>
-    </div>
-  `
+  document.getElementById("toastContainer").appendChild(toast)
 
-  const container = document.getElementById("toastContainer")
-  container.appendChild(toast)
-
-  requestAnimationFrame(() => {
-    toast.style.opacity = "1"
-    toast.style.transform = "translateY(0)"
-  })
-
-  const closeBtn = toast.querySelector(".btn-close")
-  closeBtn.addEventListener("click", () => removeToast(toast))
-
-  setTimeout(() => removeToast(toast), 4000)
-}
-
-function removeToast(toast) {
-  if (!toast || !toast.parentNode) return
-  toast.style.opacity = "0"
-  toast.style.transform = "translateY(10px)"
-  setTimeout(() => {
-    if (toast.parentNode) toast.parentNode.removeChild(toast)
-  }, 250)
+  setTimeout(() => toast.remove(), 4000)
 }
 
 async function loadStatus() {
   const res = await fetch("/api/status")
   const data = await res.json()
 
-  let success = 0
-  let failed = 0
-  let running = 0
+  let success = 0, failed = 0, running = 0
 
   let html = ""
   let dropdown = ""
 
   data.forEach(r => {
+
     if (r.status === "success") success++
     if (r.status === "failed") failed++
     if (r.status === "running") running++
 
+    // 🔥 FIX: alleen nieuwe of veranderde status
     if (!lastStatus[r.file]) {
-      if (r.status === "running") {
-        showToast(`Run gestart: ${r.file}`, "running")
-      } else if (r.status === "success") {
-        showToast(`Run succesvol: ${r.file}`, "success")
-      } else if (r.status === "failed") {
-        showToast(`Run gefaald: ${r.file}`, "failed")
-      }
-    } else if (lastStatus[r.file] !== r.status) {
-      if (r.status === "success") {
-        showToast(`Run succesvol: ${r.file}`, "success")
-      } else if (r.status === "failed") {
-        showToast(`Run gefaald: ${r.file}`, "failed")
-      } else if (r.status === "running") {
-        showToast(`Run gestart: ${r.file}`, "running")
-      }
+      if (r.status === "running") showToast("🚀 Run gestart", "running")
+      if (r.status === "success") showToast("✅ Run succesvol", "success")
+      if (r.status === "failed") showToast("❌ Run gefaald", "failed")
+    }
+    else if (lastStatus[r.file] !== r.status) {
+      if (r.status === "success") showToast("✅ Run succesvol", "success")
+      if (r.status === "failed") showToast("❌ Run gefaald", "failed")
     }
 
     lastStatus[r.file] = r.status
 
-    const color =
-      r.status === "success" ? "green" :
-      r.status === "failed" ? "red" :
-      "orange"
-
-    html += `
-      <div onclick="openLog('${r.file}')" style="cursor:pointer">
-        ${r.file}
-        <span style="color:${color}">
-          ● ${r.status}
-        </span>
-      </div>
-    `
-
-    dropdown += `
-      <option value="${r.file}">
-        ${r.file} (${r.status})
-      </option>
-    `
+    html += `<div>${r.file} (${r.status})</div>`
+    dropdown += `<option value="${r.file}">${r.file}</option>`
   })
+
+  // 🔥 opslaan
+  localStorage.setItem("lastStatus", JSON.stringify(lastStatus))
 
   document.getElementById("statusList").innerHTML = html
 
   const select = document.getElementById("logSelect")
   const prev = select.value
+
   select.innerHTML = dropdown
 
   if (data.length > 0) {
     const newest = data[0].file
-
     if (!prev || currentSelected !== newest) {
       select.value = newest
       currentSelected = newest
-    } else if (prev) {
-      select.value = prev
     }
   }
 
   updateChart(success, failed, running)
 }
 
-function openLog(file) {
-  window.location.href = "/log/" + file
-}
-
 function updateChart(success, failed, running) {
   const total = success + failed + running
 
-  const dataValues = [success, failed, running]
   const labels = [
-    `Success (${percentage(success, total)}%)`,
-    `Failed (${percentage(failed, total)}%)`,
-    `Running (${percentage(running, total)}%)`
+    `Success (${percent(success,total)}%)`,
+    `Failed (${percent(failed,total)}%)`,
+    `Running (${percent(running,total)}%)`
   ]
 
-  const colors = ["#28a745", "#dc3545", "#ffc107"]
+  const dataValues = [success, failed, running]
 
   if (!chart) {
     chart = new Chart(document.getElementById("chart"), {
       type: "doughnut",
       data: {
-        labels: labels,
+        labels,
         datasets: [{
           data: dataValues,
-          backgroundColor: colors
+          backgroundColor: ["#28a745","#dc3545","#ffc107"]
         }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: true,
-        plugins: {
-          legend: {
-            position: "bottom"
-          }
-        }
       }
     })
   } else {
@@ -276,10 +201,7 @@ function updateChart(success, failed, running) {
   }
 }
 
-function percentage(value, total) {
-  if (total === 0) return 0
-  return Math.round((value / total) * 100)
-}
+function percent(v,t){ return t===0?0:Math.round((v/t)*100) }
 
 async function loadLog() {
   const file = document.getElementById("logSelect").value
@@ -289,7 +211,7 @@ async function loadLog() {
   const data = await res.json()
 
   const el = document.getElementById("liveLog")
-  el.innerHTML = data.lines.map(l => `<div>${escapeHtml(l)}</div>`).join("")
+  el.innerHTML = data.lines.map(l => `<div>${l}</div>`).join("")
   el.scrollTop = el.scrollHeight
 }
 
@@ -299,7 +221,6 @@ setInterval(() => {
 }, 2000)
 
 loadStatus()
-setTimeout(loadLog, 500)
 </script>
 
 </body>
