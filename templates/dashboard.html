@@ -132,14 +132,31 @@ async function loadStatus() {
     if (r.status === "failed") failed++
     if (r.status === "running") running++
 
-    // popup detectie
-    if (lastStatus[r.file] && lastStatus[r.file] !== r.status) {
-      if (r.status === "success") showToast(`✅ ${r.file} gelukt`, "success")
-      if (r.status === "failed") showToast(`❌ ${r.file} gefaald`, "failed")
-    }
+    // 🔥 NIEUWE LOGICA
+    if (!lastStatus[r.file]) {
+      // eerste keer gezien
 
-    if (!lastStatus[r.file] && r.status === "running") {
-      showToast(`🚀 Run gestart`, "running")
+      if (r.status === "running") {
+        showToast(`🚀 Run gestart`, "running")
+      }
+
+      if (r.status === "success") {
+        showToast(`✅ Run direct succesvol`, "success")
+      }
+
+      if (r.status === "failed") {
+        showToast(`❌ Run direct gefaald`, "failed")
+      }
+    } else if (lastStatus[r.file] !== r.status) {
+      // status veranderd
+
+      if (r.status === "success") {
+        showToast(`✅ ${r.file} gelukt`, "success")
+      }
+
+      if (r.status === "failed") {
+        showToast(`❌ ${r.file} gefaald`, "failed")
+      }
     }
 
     lastStatus[r.file] = r.status
@@ -199,11 +216,7 @@ function updateChart(success, failed, running) {
     `Running (${percentage(running, total)}%)`
   ]
 
-  const colors = [
-    "#28a745", // groen
-    "#dc3545", // rood
-    "#ffc107"  // geel
-  ]
+  const colors = ["#28a745", "#dc3545", "#ffc107"]
 
   if (!chart) {
     chart = new Chart(document.getElementById('chart'), {
