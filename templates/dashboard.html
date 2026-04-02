@@ -94,6 +94,7 @@
 
 <script>
 let chart
+let currentSelected = null
 
 async function loadStatus() {
   const res = await fetch("/api/status")
@@ -105,7 +106,7 @@ async function loadStatus() {
   let html = ""
   let dropdown = ""
 
-  data.forEach(r => {
+  data.forEach((r, index) => {
 
     if (r.status === "success") success++
     if (r.status === "failed") failed++
@@ -114,7 +115,6 @@ async function loadStatus() {
       r.status === "success" ? "green" :
       r.status === "failed" ? "red" : "gray"
 
-    // 🔥 klikbaar
     html += `
       <div style="cursor:pointer"
            onclick="openLog('${r.file}')">
@@ -139,10 +139,21 @@ async function loadStatus() {
 
   select.innerHTML = dropdown
 
-  if (prev) {
-    select.value = prev
-  } else if (data.length > 0) {
-    select.value = data[0].file
+  // 🔥 NIEUW: detecteer nieuwe run
+  if (data.length > 0) {
+    const newest = data[0].file
+
+    // als huidige selectie niet bestaat of nieuwe run
+    if (!prev || !data.find(d => d.file === prev)) {
+      select.value = newest
+      currentSelected = newest
+    }
+
+    // 🔥 als er een NIEUWE run is → auto selecteren
+    if (currentSelected !== newest) {
+      select.value = newest
+      currentSelected = newest
+    }
   }
 
   updateChart(success, failed)
@@ -180,11 +191,13 @@ async function loadLog() {
     data.lines.map(l => `<div>${l}</div>`).join("")
 }
 
+// 🔄 refresh
 setInterval(() => {
   loadStatus()
   loadLog()
 }, 2000)
 
+// initial load
 loadStatus()
 setTimeout(loadLog, 500)
 </script>
