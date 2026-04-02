@@ -7,6 +7,11 @@ from token_service import refresh, get_valid_token
 from slot_generator import generate_slots
 from booking import book_slots
 
+LOG_DIR = "logs"
+os.makedirs(LOG_DIR, exist_ok=True)
+
+RUN_ID = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+LOG_FILE = f"{LOG_DIR}/run_{RUN_ID}.log"
 
 # 🔥 TELEGRAM CONFIG
 TELEGRAM_TOKEN = "8707541665:AAEmnzJqykk6YpzHkyDGp2TQRIcjPKcg5D4"
@@ -28,6 +33,8 @@ def send_telegram(message):
 def log(msg):
     print(msg)
     send_telegram(msg)
+    with open(LOG_FILE, "a") as f:
+        f.write(msg + "\n")
 
 
 def parse_time(t):
