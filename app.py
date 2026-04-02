@@ -20,20 +20,21 @@ def load_config():
         return json.load(f)
 
 
+def save_config(config):
+    with open(CONFIG_FILE, "w") as f:
+        json.dump(config, f, indent=2)
+
+
 def list_logs():
     if not os.path.exists(LOG_DIR):
         return []
-
-    files = sorted(os.listdir(LOG_DIR), reverse=True)
-    return files
+    return sorted(os.listdir(LOG_DIR), reverse=True)
 
 
 def load_log(filename):
     path = os.path.join(LOG_DIR, filename)
-
     if not os.path.exists(path):
         return []
-
     with open(path) as f:
         return f.readlines()
 
@@ -47,7 +48,6 @@ def login():
         if request.form["username"] == USERNAME and request.form["password"] == PASSWORD:
             session["logged_in"] = True
             return redirect("/dashboard")
-
     return render_template("login.html")
 
 
@@ -59,27 +59,57 @@ def dashboard():
     if not session.get("logged_in"):
         return redirect("/")
 
-    logs = list_logs()
-    config = load_config()
-
-    return render_template("dashboard.html", logs=logs, config=config)
+    return render_template(
+        "dashboard.html",
+        config=load_config(),
+        logs=list_logs()
+    )
 
 
 # ─────────────────────────────────────────────
-# VIEW LOG
+# UPDATE CONFIG
+# ─────────────────────────────────────────────
+@app.route("/update_config", methods=["POST"])
+def update_config():
+    if not session.get("logged_in"):
+        return redirect("/")
+
+    config = load_config()
+
+    # SIMPLE FIELDS
+    config["days_ahead"] = int(request.form["days_ahead"])
+    config["run_time"]["prep"] = request.form["prep"]
+    config["run_time"]["booking"] = request.form["booking"]
+
+    # BOOKING RULES
+    for i, rule in enumerate(config["booking_rules"]):
+        key_times = f"times_{i}"
+        key_duration = f"duration_{i}"
+
+        times = request.form.get(key_times, "")
+        config["booking_rules"][i]["times"] = [t.strip() for t in times.split(",") if t.strip()]
+        config["booking_rules"][i]["duration"] = int(request.form.get(key_duration, 1))
+
+    save_config(config)
+
+    return redirect("/dashboard")
+
+
+# ─────────────────────────────────────────────
+# LOG VIEW
 # ─────────────────────────────────────────────
 @app.route("/log/<filename>")
 def view_log(filename):
     if not session.get("logged_in"):
         return redirect("/")
 
-    content = load_log(filename)
-    return render_template("log.html", filename=filename, content=content)
+    return render_template(
+        "log.html",
+        filename=filename,
+        content=load_log(filename)
+    )
 
 
-# ─────────────────────────────────────────────
-# LOGOUT
-# ─────────────────────────────────────────────
 @app.route("/logout")
 def logout():
     session.clear()
