@@ -10,40 +10,67 @@ from slot_generator import generate_slots
 from booking import book_slots
 
 # ─────────────────────────────────────────────
-# LOGGING SETUP
+# DIRECTORIES
 # ─────────────────────────────────────────────
 LOG_DIR = "logs"
+STATUS_DIR = "status"
+
 os.makedirs(LOG_DIR, exist_ok=True)
+os.makedirs(STATUS_DIR, exist_ok=True)
 
-RUN_ID = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-LOG_FILE = f"{LOG_DIR}/run_{RUN_ID}.log"
-
+LOG_FILE = None
 LOCK_FILE = "run.lock"
 
-# 🔥 TELEGRAM CONFIG
+# TELEGRAM
 TELEGRAM_TOKEN = "8707541665:AAEmnzJqykk6YpzHkyDGp2TQRIcjPKcg5D4"
 CHAT_ID = "7106070066"
+
+
+# ─────────────────────────────────────────────
+# LOG FILE
+# ─────────────────────────────────────────────
+def create_log_file():
+    run_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S_%f")
+    return f"{LOG_DIR}/run_{run_id}.log"
+
+
+def write_status(status, message=""):
+    filename = os.path.basename(LOG_FILE).replace(".log", ".json")
+    path = f"{STATUS_DIR}/{filename}"
+
+    data = {
+        "status": status,
+        "message": message,
+        "timestamp": datetime.now().isoformat()
+    }
+
+    with open(path, "w") as f:
+        json.dump(data, f)
 
 
 # ─────────────────────────────────────────────
 # TELEGRAM
 # ─────────────────────────────────────────────
 def send_telegram(message):
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    payload = {
-        "chat_id": CHAT_ID,
-        "text": message
-    }
     try:
-        requests.post(url, json=payload, timeout=5)
-    except Exception as e:
-        print("Telegram error:", e)
+        requests.post(
+            f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+            json={"chat_id": CHAT_ID, "text": message},
+            timeout=5
+        )
+    except:
+        pass
 
 
 # ─────────────────────────────────────────────
 # LOGGING
 # ─────────────────────────────────────────────
 def log(msg):
+    global LOG_FILE
+
+    if LOG_FILE is None:
+        LOG_FILE = create_log_file()
+
     print(msg)
     send_telegram(msg)
 
@@ -72,31 +99,25 @@ def wait_until(target_time):
     if now >= target:
         target += timedelta(days=1)
 
-    log(f"⏳ Wachten tot {target}")
-
     while True:
         now = datetime.now()
-        seconds_to_wait = (target - now).total_seconds()
-
-        if seconds_to_wait <= 0:
+        if (target - now).total_seconds() <= 0:
             break
-
-        print(f"⏳ Nog {int(seconds_to_wait)} sec wachten...")
-        time.sleep(min(seconds_to_wait, 1))
+        time.sleep(1)
 
 
 # ─────────────────────────────────────────────
-# CORE BOOKING FLOW (HERGEBRUIKBAAR)
+# BOOKING FLOW
 # ─────────────────────────────────────────────
 def execute_booking_flow(config, token):
+    write_status("running")
+
     slots = generate_slots(config)
     log(f"🎯 Slots: {slots}")
 
     if not slots:
-        log("❌ Geen slots gegenereerd")
+        write_status("failed", "geen slots")
         return False
-
-    log("🚀 START BOOKING!")
 
     for i in range(10):
         log(f"🔁 Attempt {i+1}")
@@ -105,26 +126,31 @@ def execute_booking_flow(config, token):
 
         if success:
             log("🎉 Booking gelukt!")
+            write_status("success")
             return True
 
         time.sleep(0.3)
 
     log("❌ Geen booking gelukt")
+    write_status("failed")
     return False
 
 
 # ─────────────────────────────────────────────
-# RUN NOW (🔥 NIEUW)
+# RUN NOW
 # ─────────────────────────────────────────────
 def run_now():
+    global LOG_FILE
+    LOG_FILE = create_log_file()
+
     if os.path.exists(LOCK_FILE):
-        log("⚠️ Er draait al een run")
+        log("⚠️ Run bezig")
         return
 
     open(LOCK_FILE, "w").close()
 
     try:
-        log("🚀 RUN NOW gestart")
+        log("🚀 RUN NOW")
 
         refresh()
         token = get_valid_token()
@@ -135,22 +161,24 @@ def run_now():
         execute_booking_flow(config, token)
 
     finally:
-        if os.path.exists(LOCK_FILE):
-            os.remove(LOCK_FILE)
+        os.remove(LOCK_FILE)
 
 
 # ─────────────────────────────────────────────
-# MAIN (SCHEDULED)
+# MAIN
 # ─────────────────────────────────────────────
 def main():
+    global LOG_FILE
+    LOG_FILE = create_log_file()
+
     if os.path.exists(LOCK_FILE):
-        log("⚠️ Er draait al een run")
+        log("⚠️ Run bezig")
         return
 
     open(LOCK_FILE, "w").close()
 
     try:
-        log("🚀 Padel bot gestart")
+        log("🚀 Scheduled run")
 
         with open("config.json") as f:
             config = json.load(f)
@@ -158,36 +186,21 @@ def main():
         PREP_TIME = parse_time(config["run_time"]["prep"])
         BOOKING_TIME = parse_time(config["run_time"]["booking"])
 
-        # 1. Wachten tot prep moment
-        log("⏳ Waiting for prep time...")
         wait_until(PREP_TIME)
 
-        # 2. Token refresh
-        log("🔄 Token refresh net voor booking")
         refresh()
         token = get_valid_token()
 
-        # 3. Slots + booking
-        slots = generate_slots(config)
-        log(f"🎯 Slots: {slots}")
-
-        if not slots:
-            log("❌ Geen slots gegenereerd")
-            return
-
-        # 4. Wachten tot booking moment
-        log("⏳ Waiting for booking window...")
         wait_until(BOOKING_TIME)
 
         execute_booking_flow(config, token)
 
     finally:
-        if os.path.exists(LOCK_FILE):
-            os.remove(LOCK_FILE)
+        os.remove(LOCK_FILE)
 
 
 # ─────────────────────────────────────────────
-# ENTRY POINT
+# ENTRY
 # ─────────────────────────────────────────────
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "run_now":
