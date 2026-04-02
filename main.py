@@ -2,23 +2,32 @@ import os
 import json
 import time
 import requests
+import sys
 from datetime import datetime, timedelta
 
 from token_service import refresh, get_valid_token
 from slot_generator import generate_slots
 from booking import book_slots
 
+# ─────────────────────────────────────────────
+# LOGGING SETUP
+# ─────────────────────────────────────────────
 LOG_DIR = "logs"
 os.makedirs(LOG_DIR, exist_ok=True)
 
 RUN_ID = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 LOG_FILE = f"{LOG_DIR}/run_{RUN_ID}.log"
 
+LOCK_FILE = "run.lock"
+
 # 🔥 TELEGRAM CONFIG
 TELEGRAM_TOKEN = "8707541665:AAEmnzJqykk6YpzHkyDGp2TQRIcjPKcg5D4"
 CHAT_ID = "7106070066"
 
 
+# ─────────────────────────────────────────────
+# TELEGRAM
+# ─────────────────────────────────────────────
 def send_telegram(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     payload = {
@@ -31,30 +40,26 @@ def send_telegram(message):
         print("Telegram error:", e)
 
 
+# ─────────────────────────────────────────────
+# LOGGING
+# ─────────────────────────────────────────────
 def log(msg):
     print(msg)
     send_telegram(msg)
-    with open(LOG_FILE, "a") as f:
+
+    with open(LOG_FILE, "a", encoding="utf-8") as f:
         f.write(msg + "\n")
 
 
+# ─────────────────────────────────────────────
+# HELPERS
+# ─────────────────────────────────────────────
 def parse_time(t):
     h, m, s = map(int, t.split(":"))
     return (h, m, s)
 
 
-with open("config.json") as f:
-    config = json.load(f)
-
-PREP_TIME = parse_time(config["run_time"]["prep"])
-BOOKING_TIME = parse_time(config["run_time"]["booking"])
-
-
 def wait_until(target_time):
-    """
-    Wacht tot een specifiek tijdstip.
-    Als dat tijdstip vandaag al voorbij is, wacht tot morgen.
-    """
     now = datetime.now()
 
     target = now.replace(
@@ -64,7 +69,6 @@ def wait_until(target_time):
         microsecond=0
     )
 
-    # Alleen één keer bepalen of target naar morgen moet
     if now >= target:
         target += timedelta(days=1)
 
@@ -81,38 +85,19 @@ def wait_until(target_time):
         time.sleep(min(seconds_to_wait, 1))
 
 
-def main():
-    log("🚀 Padel bot gestart")
-
-    # 1. Wachten tot prep moment
-    log("⏳ Waiting for prep time...")
-    wait_until(PREP_TIME)
-
-    # 2. Token refresh vlak voor booking
-    log("🔄 Token refresh net voor booking")
-    refresh()
-
-    token = get_valid_token()
-
-    # 3. Config laden
-    with open("config.json") as f:
-        config = json.load(f)
-
-    # 4. Slots genereren
+# ─────────────────────────────────────────────
+# CORE BOOKING FLOW (HERGEBRUIKBAAR)
+# ─────────────────────────────────────────────
+def execute_booking_flow(config, token):
     slots = generate_slots(config)
     log(f"🎯 Slots: {slots}")
 
     if not slots:
         log("❌ Geen slots gegenereerd")
-        return
-
-    # 5. Wachten tot exact booking moment
-    log("⏳ Waiting for booking window...")
-    wait_until(BOOKING_TIME)
+        return False
 
     log("🚀 START BOOKING!")
 
-    # 6. Retry loop
     for i in range(10):
         log(f"🔁 Attempt {i+1}")
 
@@ -120,12 +105,92 @@ def main():
 
         if success:
             log("🎉 Booking gelukt!")
-            return
+            return True
 
         time.sleep(0.3)
 
     log("❌ Geen booking gelukt")
+    return False
 
 
+# ─────────────────────────────────────────────
+# RUN NOW (🔥 NIEUW)
+# ─────────────────────────────────────────────
+def run_now():
+    if os.path.exists(LOCK_FILE):
+        log("⚠️ Er draait al een run")
+        return
+
+    open(LOCK_FILE, "w").close()
+
+    try:
+        log("🚀 RUN NOW gestart")
+
+        refresh()
+        token = get_valid_token()
+
+        with open("config.json") as f:
+            config = json.load(f)
+
+        execute_booking_flow(config, token)
+
+    finally:
+        if os.path.exists(LOCK_FILE):
+            os.remove(LOCK_FILE)
+
+
+# ─────────────────────────────────────────────
+# MAIN (SCHEDULED)
+# ─────────────────────────────────────────────
+def main():
+    if os.path.exists(LOCK_FILE):
+        log("⚠️ Er draait al een run")
+        return
+
+    open(LOCK_FILE, "w").close()
+
+    try:
+        log("🚀 Padel bot gestart")
+
+        with open("config.json") as f:
+            config = json.load(f)
+
+        PREP_TIME = parse_time(config["run_time"]["prep"])
+        BOOKING_TIME = parse_time(config["run_time"]["booking"])
+
+        # 1. Wachten tot prep moment
+        log("⏳ Waiting for prep time...")
+        wait_until(PREP_TIME)
+
+        # 2. Token refresh
+        log("🔄 Token refresh net voor booking")
+        refresh()
+        token = get_valid_token()
+
+        # 3. Slots + booking
+        slots = generate_slots(config)
+        log(f"🎯 Slots: {slots}")
+
+        if not slots:
+            log("❌ Geen slots gegenereerd")
+            return
+
+        # 4. Wachten tot booking moment
+        log("⏳ Waiting for booking window...")
+        wait_until(BOOKING_TIME)
+
+        execute_booking_flow(config, token)
+
+    finally:
+        if os.path.exists(LOCK_FILE):
+            os.remove(LOCK_FILE)
+
+
+# ─────────────────────────────────────────────
+# ENTRY POINT
+# ─────────────────────────────────────────────
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) > 1 and sys.argv[1] == "run_now":
+        run_now()
+    else:
+        main()
