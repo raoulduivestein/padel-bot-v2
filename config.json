@@ -3,9 +3,12 @@
     "prep": "07:59:55",
     "booking": "08:00:00"
   },
+
   "days_ahead": 9,
+
   "club_id": 94,
   "sports_package_id": 63,
+
   "members": [
     {
       "member_id": "bUpDTmkxR2kwMDZWNUk2SVQ5QithUQ==",
@@ -16,13 +19,10 @@
       "name": "Senn"
     }
   ],
-  "courts": [
-    { "id": 737381, "name": "Court 1" },
-    { "id": 737383, "name": "Court 2" },
-    { "id": 737385, "name": "Court 3" }
-  ],
+
   "preferred_courts": [737381, 737383, 737385],
   "fallback_to_any": true,
+
   "booking_rules": [
     {
       "day": "monday",
