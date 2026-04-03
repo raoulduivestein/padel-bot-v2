@@ -3,6 +3,7 @@ import json
 import time
 import requests
 import sys
+import traceback
 from datetime import datetime, timedelta
 
 from token_service import refresh, get_valid_token
@@ -19,7 +20,6 @@ os.makedirs(LOG_DIR, exist_ok=True)
 os.makedirs(STATUS_DIR, exist_ok=True)
 
 LOG_FILE = None
-LOCK_FILE = "run.lock"
 
 # TELEGRAM
 TELEGRAM_TOKEN = "8707541665:AAEmnzJqykk6YpzHkyDGp2TQRIcjPKcg5D4"
@@ -121,28 +121,35 @@ def wait_until(target_time):
 def execute_booking_flow(config, token):
     write_status("running")
 
-    slots = generate_slots(config)
-    log(f"🎯 Slots: {slots}")
+    try:
+        slots = generate_slots(config)
+        log(f"🎯 Slots: {slots}")
 
-    if not slots:
-        write_status("failed", "geen slots")
+        if not slots:
+            write_status("failed", "geen slots")
+            return False
+
+        for i in range(10):
+            log(f"🔁 Attempt {i+1}")
+
+            success = book_slots(slots, config, token)
+
+            if success:
+                log("🎉 Booking gelukt!")
+                write_status("success")
+                return True
+
+            time.sleep(0.3)
+
+        log("❌ Geen booking gelukt")
+        write_status("failed")
         return False
 
-    for i in range(10):
-        log(f"🔁 Attempt {i+1}")
-
-        success = book_slots(slots, config, token)
-
-        if success:
-            log("🎉 Booking gelukt!")
-            write_status("success")
-            return True
-
-        time.sleep(0.3)
-
-    log("❌ Geen booking gelukt")
-    write_status("failed")
-    return False
+    except Exception as e:
+        log(f"❌ Flow error: {str(e)}")
+        log(traceback.format_exc())
+        write_status("failed", str(e))
+        return False
 
 
 # ─────────────────────────────────────────────
@@ -152,15 +159,9 @@ def run_now():
     global LOG_FILE
     LOG_FILE = create_log_file()
 
-    if os.path.exists(LOCK_FILE):
-        log("⚠️ Run bezig")
-        return
-
-    open(LOCK_FILE, "w").close()
+    log("🚀 RUN NOW")
 
     try:
-        log("🚀 RUN NOW")
-
         refresh()
         token = get_valid_token()
 
@@ -169,43 +170,43 @@ def run_now():
 
         execute_booking_flow(config, token)
 
-    finally:
-        os.remove(LOCK_FILE)
+    except Exception as e:
+        log(f"❌ Run error: {str(e)}")
+        log(traceback.format_exc())
+        write_status("failed", str(e))
 
 
 # ─────────────────────────────────────────────
-# MAIN
+# MAIN (SCHEDULED)
 # ─────────────────────────────────────────────
 def main():
     global LOG_FILE
     LOG_FILE = create_log_file()
 
-    if os.path.exists(LOCK_FILE):
-        log("⚠️ Run bezig")
-        return
-
-    open(LOCK_FILE, "w").close()
+    log("🚀 Scheduled run")
 
     try:
-        log("🚀 Scheduled run")
-
         with open("config.json") as f:
             config = json.load(f)
 
         PREP_TIME = parse_time(config["run_time"]["prep"])
         BOOKING_TIME = parse_time(config["run_time"]["booking"])
 
+        log(f"⏳ Wachten tot PREP: {PREP_TIME}")
         wait_until(PREP_TIME)
 
         refresh()
         token = get_valid_token()
 
+        log(f"⏳ Wachten tot BOOKING: {BOOKING_TIME}")
         wait_until(BOOKING_TIME)
 
         execute_booking_flow(config, token)
 
-    finally:
-        os.remove(LOCK_FILE)
+    except Exception as e:
+        log(f"❌ Main error: {str(e)}")
+        log(traceback.format_exc())
+        write_status("failed", str(e))
 
 
 # ─────────────────────────────────────────────
