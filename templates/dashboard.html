@@ -81,9 +81,9 @@ body {
     
     <h6 class="mb-3">⚙️ Config</h6>
 
-    <form method="POST" action="/update_config">
+    <!-- ✅ ID TOEGEVOEGD -->
+    <form id="configForm" method="POST" action="/update_config">
 
-      <!-- 🔥 COMPACT CONFIG -->
       <div class="row g-2 mb-3">
 
         <div class="col-4">
@@ -121,7 +121,6 @@ body {
               <span id="icon-{{ idx.value }}">▶</span>
             </div>
 
-            <!-- 🔥 STANDAARD DICHT -->
             <div id="day-{{ idx.value }}" class="mt-2" style="display:none;">
 
               <div class="row g-2">
@@ -180,7 +179,6 @@ body {
 </div>
 
 </div>
-
 </div>
 
 <!-- TOAST -->
@@ -317,6 +315,29 @@ setInterval(() => {
 }, 2000)
 
 loadStatus()
+
+/* 🔥 NIEUW: SAVE CONFIG + TOAST */
+document.getElementById("configForm").addEventListener("submit", async function(e) {
+  e.preventDefault()
+
+  const formData = new FormData(this)
+
+  try {
+    const res = await fetch("/update_config", {
+      method: "POST",
+      body: formData
+    })
+
+    if (res.ok) {
+      showToast("💾 Config opgeslagen", "success")
+    } else {
+      showToast("❌ Opslaan mislukt", "failed")
+    }
+
+  } catch (err) {
+    showToast("❌ Fout bij opslaan", "failed")
+  }
+})
 </script>
 
 </body>
