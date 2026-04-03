@@ -82,7 +82,16 @@ def log(msg):
 # HELPERS
 # ─────────────────────────────────────────────
 def parse_time(t):
-    h, m, s = map(int, t.split(":"))
+    parts = list(map(int, t.split(":")))
+
+    if len(parts) == 2:
+        h, m = parts
+        s = 0
+    elif len(parts) == 3:
+        h, m, s = parts
+    else:
+        raise ValueError(f"Invalid time format: {t}")
+
     return (h, m, s)
 
 
