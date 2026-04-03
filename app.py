@@ -20,11 +20,9 @@ def load_config():
 
 def save_config(cfg):
     json.dump(cfg, open(CONFIG_FILE, "w"), indent=2)
+    print("✅ Config opgeslagen")
 
 
-# ─────────────────────────────────────────────
-# LOGIN
-# ─────────────────────────────────────────────
 @app.route("/", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
@@ -34,35 +32,21 @@ def login():
     return render_template("login.html")
 
 
-# ─────────────────────────────────────────────
-# DASHBOARD
-# ─────────────────────────────────────────────
 @app.route("/dashboard")
 def dashboard():
     if not session.get("logged_in"):
         return redirect("/")
 
     logs = sorted(os.listdir(LOG_DIR), reverse=True)
-
     return render_template("dashboard.html", logs=logs, config=load_config())
 
 
-# ─────────────────────────────────────────────
-# RUN NOW
-# ─────────────────────────────────────────────
 @app.route("/run_now")
 def run_now():
-    subprocess.Popen([
-        "/root/padel-bot-v2/venv/bin/python",
-        "main.py",
-        "run_now"
-    ])
+    subprocess.Popen(["python", "main.py"])
     return redirect("/dashboard")
 
 
-# ─────────────────────────────────────────────
-# UPDATE CONFIG
-# ─────────────────────────────────────────────
 @app.route("/update_config", methods=["POST"])
 def update_config():
     cfg = load_config()
@@ -71,63 +55,10 @@ def update_config():
     cfg["run_time"]["prep"] = request.form["prep"]
     cfg["run_time"]["booking"] = request.form["booking"]
 
-    for i, rule in enumerate(cfg["booking_rules"]):
-        times_raw = request.form.get(f"times_{i}", "")
-
-        cfg["booking_rules"][i]["times"] = [
-            t.strip() for t in times_raw.split(",") if t.strip()
-        ]
-
-        cfg["booking_rules"][i]["duration"] = int(
-            request.form.get(f"duration_{i}", 1)
-        )
-
     save_config(cfg)
     return redirect("/dashboard")
 
 
-# ─────────────────────────────────────────────
-# VIEW LOG PAGE
-# ─────────────────────────────────────────────
-@app.route("/log/<filename>")
-def view_log(filename):
-    path = f"{LOG_DIR}/{filename}"
-
-    if not os.path.exists(path):
-        return "Log not found"
-
-    with open(path, encoding="utf-8") as f:
-        lines = f.readlines()
-
-    return render_template("log.html", filename=filename, content=lines)
-
-
-# ─────────────────────────────────────────────
-# API STATUS
-# ─────────────────────────────────────────────
-@app.route("/api/status")
-def api_status():
-    files = sorted(os.listdir(STATUS_DIR), reverse=True)
-
-    result = []
-
-    for f in files:
-        try:
-            data = json.load(open(f"{STATUS_DIR}/{f}"))
-        except:
-            continue
-
-        result.append({
-            "file": f.replace(".json", ".log"),
-            "status": data.get("status", "unknown")
-        })
-
-    return result
-
-
-# ─────────────────────────────────────────────
-# API LOG (LIVE)
-# ─────────────────────────────────────────────
 @app.route("/api/log/<filename>")
 def api_log(filename):
     path = f"{LOG_DIR}/{filename}"
@@ -135,14 +66,32 @@ def api_log(filename):
     if not os.path.exists(path):
         return {"lines": []}
 
-    return {"lines": open(path, encoding="utf-8").readlines()[-100:]}
+    data = json.load(open(path))
+    lines = [json.dumps(e) for e in data.get("events", [])]
+
+    return {"lines": lines}
 
 
-@app.route("/logout")
-def logout():
-    session.clear()
-    return redirect("/")
+@app.route("/api/whatsapp/<filename>")
+def whatsapp(filename):
+    path = f"{LOG_DIR}/{filename}"
+
+    if not os.path.exists(path):
+        return {"message": ""}
+
+    data = json.load(open(path))
+
+    for e in data.get("events", []):
+        if e.get("type") == "booking":
+            slots = e["slots"]
+            court = e["court"]
+
+            return {
+                "message": f"{slots[0]['date']} {slots[0]['time']} {court}"
+            }
+
+    return {"message": ""}
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(debug=True)
