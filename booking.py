@@ -4,9 +4,6 @@ from concurrent.futures import ThreadPoolExecutor
 BASE_URL = "https://mobile-app-back.davidlloyd.co.uk"
 
 
-# ─────────────────────────────────────────────
-# HEADERS
-# ─────────────────────────────────────────────
 def headers(token):
     return {
         "Accept": "application/json",
@@ -18,104 +15,46 @@ def headers(token):
     }
 
 
-# ─────────────────────────────────────────────
-# GET AVAILABILITY (1x)
-# ─────────────────────────────────────────────
+def get_court_name(court_id, config):
+    for c in config.get("courts", []):
+        if c["id"] == court_id:
+            return c["name"]
+    return f"Court {court_id}"
+
+
 def get_available_courts_for_slots(slots, config, token, member):
     url = f"{BASE_URL}/clubs/{config['club_id']}/court-slots/{slots[0]['date']}/{config['sports_package_id']}"
 
-    params = {
+    r = requests.get(url, headers=headers(token), params={
         "encodedContactId": member["member_id"]
-    }
-
-    r = requests.get(url, headers=headers(token), params=params)
+    })
 
     if r.status_code != 200:
-        print("❌ Availability error:", r.text)
         return {}
 
     data = r.json()
-
     result = {}
 
     for slot in slots:
-        time = slot["time"]
-
-        courts = [
+        result[slot["time"]] = [
             s["courtId"]
             for s in data.get("slots", [])
-            if s.get("startTime") == time
+            if s.get("startTime") == slot["time"]
         ]
-
-        result[time] = courts
 
     return result
 
 
-# ─────────────────────────────────────────────
-# SLIMME COURT SELECTIE
-# ─────────────────────────────────────────────
 def select_courts_smart(slots, availability, config):
-    # 1. zelfde court proberen
-    common = None
-
-    for slot in slots:
-        courts = set(availability.get(slot["time"], []))
-
-        if common is None:
-            common = courts
-        else:
-            common = common.intersection(courts)
-
-    if common:
-        print(f"🎯 Zelfde court mogelijk: {common}")
-
-        for p in config.get("preferred_courts", []):
-            if p in common:
-                return [(slot, p) for slot in slots]
-
-        chosen = list(common)[0]
-        return [(slot, chosen) for slot in slots]
-
-    # 2. fallback → verschillende courts
-    print("↪️ Geen overlap, fallback naar verschillende courts")
-
-    selected = []
-    used = set()
-
     for slot in slots:
         possible = availability.get(slot["time"], [])
-
-        for p in config.get("preferred_courts", []):
-            if p in possible and p not in used:
-                selected.append((slot, p))
-                used.add(p)
-                break
-        else:
-            for c in possible:
-                if c not in used:
-                    selected.append((slot, c))
-                    used.add(c)
-                    break
-
-    if len(selected) == len(slots):
-        return selected
-
-    # 3. fallback → 1 court
-    print("⚠️ Slechts 1 court beschikbaar")
-
-    for slot in slots:
-        possible = availability.get(slot["time"], [])
-        if possible:
-            return [(slot, possible[0])]
-
+        for c in config["preferred_courts"]:
+            if c in possible:
+                return [(slot, c)]
     return None
 
 
-# ─────────────────────────────────────────────
-# BOOKING
-# ─────────────────────────────────────────────
-def try_book_fixed(slot, court_id, config, token, member):
+def try_book(slot, court_id, config, token, member):
     payload = {
         "bookedMemberEncodedContactId": member["member_id"],
         "courtId": court_id,
@@ -145,37 +84,37 @@ def try_book_fixed(slot, court_id, config, token, member):
     return r2.status_code == 200
 
 
-# ─────────────────────────────────────────────
-# MAIN BOOK FUNCTION
-# ─────────────────────────────────────────────
 def book_slots(slots, config, token):
     members = config["members"]
 
-    # 1. availability 1x ophalen
     availability = get_available_courts_for_slots(slots, config, token, members[0])
 
-    print("📡 Availability:", availability)
-
-    # 2. slimme selectie
     selected = select_courts_smart(slots, availability, config)
 
     if not selected:
-        print("❌ Geen banen beschikbaar")
-        return False
+        return {"success": False}
 
-    print("🎾 Geselecteerd:", selected)
+    results = []
 
-    # 3. parallel boeken
     with ThreadPoolExecutor(max_workers=len(selected)) as executor:
         futures = []
 
         for i, (slot, court_id) in enumerate(selected):
             member = members[i % len(members)]
-
             futures.append(
-                executor.submit(try_book_fixed, slot, court_id, config, token, member)
+                executor.submit(try_book, slot, court_id, config, token, member)
             )
 
-        results = [f.result() for f in futures]
+        for f in futures:
+            results.append(f.result())
 
-    return any(results)
+    if any(results):
+        slot, court_id = selected[0]
+        return {
+            "success": True,
+            "court_id": court_id,
+            "court_name": get_court_name(court_id, config),
+            "slots": slots
+        }
+
+    return {"success": False}
