@@ -219,7 +219,20 @@ def update_player():
 
     save_players(players)
     return {"status": "success"}
+    
+# PLAYERS
+@app.route("/api/players_list")
+def players_list():
+    players = load_players()
 
+    return [
+        {
+            "id": k,
+            "name": v.get("name"),
+            "phone": v.get("phone", "")
+        }
+        for k, v in players.items()
+    ]
 
 # ─────────────────────────────────────────────
 # STATUS + LOGS
