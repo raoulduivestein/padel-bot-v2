@@ -53,7 +53,6 @@ body {
   to   { transform: translateX(0); opacity:1 }
 }
 </style>
-
 </head>
 
 <body>
@@ -78,13 +77,11 @@ body {
 <!-- CONFIG -->
 <div class="col-12 col-lg-4">
   <div class="card p-3">
-    
     <h6 class="mb-3">⚙️ Config</h6>
 
     <form id="configForm" method="POST" action="/update_config">
 
       <div class="row g-2 mb-3">
-
         <div class="col-4">
           <label class="small">Days</label>
           <input name="days_ahead" class="form-control" value="{{ config.days_ahead }}">
@@ -99,7 +96,6 @@ body {
           <label class="small">Book</label>
           <input type="time" name="booking" class="form-control" value="{{ config.run_time.booking }}">
         </div>
-
       </div>
 
       <hr>
@@ -123,7 +119,6 @@ body {
             <div id="day-{{ idx.value }}" class="mt-2" style="display:none;">
 
               <div class="row g-2">
-
                 <div class="col-6">
                   <label class="small">Start</label>
                   <input type="time"
@@ -139,7 +134,6 @@ body {
                          class="form-control"
                          value="{{ rule.duration }}">
                 </div>
-
               </div>
 
             </div>
@@ -147,7 +141,6 @@ body {
           </div>
 
           {% set idx.value = idx.value + 1 %}
-
           {% endif %}
         {% endfor %}
       {% endfor %}
@@ -155,7 +148,6 @@ body {
       <button class="btn btn-dark w-100 mt-2">💾 Opslaan</button>
 
     </form>
-
   </div>
 </div>
 
@@ -227,104 +219,45 @@ async function loadStatus() {
   let html = "", dropdown = ""
 
   data.forEach(r => {
-
     if (r.status === "success") success++
     if (r.status === "failed") failed++
     if (r.status === "running") running++
-
-    if (!lastStatus[r.file]) {
-      if (r.status === "running") showToast("🚀 Run gestart", "running")
-      if (r.status === "success") showToast("✅ Run succesvol", "success")
-      if (r.status === "failed") showToast("❌ Run gefaald", "failed")
-    }
-    else if (lastStatus[r.file] !== r.status) {
-      if (r.status === "success") showToast("✅ Run succesvol", "success")
-      if (r.status === "failed") showToast("❌ Run gefaald", "failed")
-    }
-
-    lastStatus[r.file] = r.status
 
     html += `<div>${r.file} (${r.status})</div>`
     dropdown += `<option value="${r.file}">${r.file}</option>`
   })
 
-  localStorage.setItem("lastStatus", JSON.stringify(lastStatus))
-
   document.getElementById("statusList").innerHTML = html
-
-  const select = document.getElementById("logSelect")
-  const prev = select.value
-
-  select.innerHTML = dropdown
-
-  if (data.length > 0) {
-    const newest = data[0].file
-    if (!prev || currentSelected !== newest) {
-      select.value = newest
-      currentSelected = newest
-    }
-  }
+  document.getElementById("logSelect").innerHTML = dropdown
 
   updateChart(success, failed, running)
 }
 
 function updateChart(success, failed, running) {
-  const total = success + failed + running
-
-  const labels = [
-    `Success (${percent(success,total)}%)`,
-    `Failed (${percent(failed,total)}%)`,
-    `Running (${percent(running,total)}%)`
-  ]
-
-  const dataValues = [success, failed, running]
-
   if (!chart) {
     chart = new Chart(document.getElementById("chart"), {
       type: "doughnut",
       data: {
-        labels,
+        labels: ["Success", "Failed", "Running"],
         datasets: [{
-          data: dataValues,
+          data: [success, failed, running],
           backgroundColor: ["#28a745","#dc3545","#ffc107"]
         }]
       }
     })
   } else {
-    chart.data.labels = labels
-    chart.data.datasets[0].data = dataValues
+    chart.data.datasets[0].data = [success, failed, running]
     chart.update()
   }
 }
 
-function percent(v,t){ return t===0?0:Math.round((v/t)*100) }
-
-async function loadLog() {
-  const file = document.getElementById("logSelect").value
-  if (!file) return
-
-  const res = await fetch(`/api/log/${file}`)
-  const data = await res.json()
-
-  const el = document.getElementById("liveLog")
-  el.innerHTML = data.lines.map(l => `<div>${l}</div>`).join("")
-  el.scrollTop = el.scrollHeight
-}
-
 function toggleDay(i) {
   const el = document.getElementById("day-"+i)
-  const icon = document.getElementById("icon-"+i)
-
-  if (el.style.display === "none") {
-    el.style.display = "block"
-    icon.innerText = "▼"
-  } else {
-    el.style.display = "none"
-    icon.innerText = "▶"
-  }
+  el.style.display = el.style.display === "none" ? "block" : "none"
 }
 
-/* BOOKINGS */
+/* BOOKINGS + PLAYERS */
+
 async function fetchBookings() {
   showToast("📥 Boekingen ophalen...", "running")
 
@@ -340,26 +273,43 @@ async function fetchBookings() {
 }
 
 async function loadBookings() {
-  const res = await fetch("/api/bookings")
-  const data = await res.json()
+  const [bRes, pRes] = await Promise.all([
+    fetch("/api/bookings"),
+    fetch("/api/players")
+  ])
+
+  const bookings = await bRes.json()
+  const players = await pRes.json()
 
   let html = ""
 
-  data.forEach((b, i) => {
+  bookings.forEach((b, i) => {
     html += `
       <div class="day-card mb-2">
-
         <div class="day-header" onclick="toggleBooking(${i})">
           <span>${b.datetime} - ${b.status}</span>
           <span id="bicon-${i}">▶</span>
         </div>
 
-        <div id="booking-${i}" style="display:none; margin-top:8px;">
-          <div class="small text-muted mb-1">Baan: ${b.court}</div>
+        <div id="booking-${i}" style="display:none;">
+          <div class="small mb-2">Baan: ${b.court}</div>
 
-          ${b.players.map(p => `<div>🎾 ${p}</div>`).join("")}
+          ${b.players.map(p => {
+            const pdata = players[p.id] || {}
+            return `
+              <div class="border p-2 mb-2 rounded">
+                <strong>🎾 ${p.name}</strong><br>
+
+                📞 <input value="${pdata.phone || ""}" 
+                    onchange="updatePlayer('${p.id}','phone',this.value)"><br>
+
+                ⭐ ${renderRating(p.id, pdata.rating || 3)}<br>
+                ⏰ ${renderPunctuality(p.id, pdata.punctuality || 3)}
+              </div>
+            `
+          }).join("")}
+
         </div>
-
       </div>
     `
   })
@@ -367,50 +317,42 @@ async function loadBookings() {
   document.getElementById("bookingsList").innerHTML = html
 }
 
-function toggleBooking(i) {
-  const el = document.getElementById("booking-"+i)
-  const icon = document.getElementById("bicon-"+i)
-
-  if (el.style.display === "none") {
-    el.style.display = "block"
-    icon.innerText = "▼"
-  } else {
-    el.style.display = "none"
-    icon.innerText = "▶"
+function renderRating(id, value) {
+  let html = ""
+  for (let i = 1; i <= 5; i++) {
+    html += `<span onclick="updatePlayer('${id}','rating',${i})">${i <= value ? "🎾" : "⚪"}</span>`
   }
+  return html
 }
 
-/* INIT */
-setInterval(() => {
-  loadStatus()
-  loadLog()
-}, 2000)
-
-loadStatus()
-loadBookings()
-
-/* SAVE CONFIG */
-document.getElementById("configForm").addEventListener("submit", async function(e) {
-  e.preventDefault()
-
-  const formData = new FormData(this)
-
-  try {
-    const res = await fetch("/update_config", {
-      method: "POST",
-      body: formData
-    })
-
-    if (res.ok) {
-      showToast("💾 Config opgeslagen", "success")
-    } else {
-      showToast("❌ Opslaan mislukt", "failed")
-    }
-
-  } catch (err) {
-    showToast("❌ Fout bij opslaan", "failed")
+function renderPunctuality(id, value) {
+  let html = ""
+  for (let i = 1; i <= 5; i++) {
+    html += `<span onclick="updatePlayer('${id}','punctuality',${i})">${i <= value ? "⏰" : "⚪"}</span>`
   }
-})
+  return html
+}
+
+async function updatePlayer(id, field, value) {
+  let payload = { id }
+  payload[field] = value
+
+  await fetch("/api/update_player", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify(payload)
+  })
+
+  showToast("💾 Speler opgeslagen", "success")
+}
+
+function toggleBooking(i) {
+  const el = document.getElementById("booking-"+i)
+  el.style.display = el.style.display === "none" ? "block" : "none"
+}
+
+loadBookings()
+loadStatus()
 </script>
 
 </body>
