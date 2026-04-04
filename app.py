@@ -108,8 +108,11 @@ def fetch_bookings():
             url,
             headers={
                 "Authorization": f"Bearer {token}",
+                "Accept": "application/json",
+                "Content-Type": "application/json",
                 "User-Agent": "Mozilla/5.0",
-                "Accept": "application/json"
+                "X-App-Version": "149.0.0",
+                "X-Requested-With": "co.uk.davidlloyd.mobileapp",
             },
             timeout=20
         )
