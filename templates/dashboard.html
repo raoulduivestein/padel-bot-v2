@@ -15,10 +15,16 @@ body {
   font-family: 'Inter', sans-serif;
   background: linear-gradient(135deg, #f5f7fa, #e4ecf3);
 }
+
 .card {
   border-radius: 16px;
   box-shadow: 0 10px 30px rgba(0,0,0,0.08);
 }
+
+/* compacte kalender */
+.fc { font-size: 12px; }
+.fc-toolbar-title { font-size: 16px !important; }
+.fc-daygrid-event { padding: 2px 4px; font-size: 11px; }
 </style>
 </head>
 
@@ -30,7 +36,7 @@ body {
 <div class="d-flex justify-content-between mb-3">
   <h5>🎾 Padel Bot</h5>
   <div>
-    <a href="/run_now" class="btn btn-success btn-sm">Run</a>
+    <a href="/run_now" class="btn btn-success btn-sm">🚀 Run</a>
     <a href="/logout" class="btn btn-danger btn-sm">Logout</a>
   </div>
 </div>
@@ -47,7 +53,41 @@ body {
 <input type="time" name="prep" class="form-control mb-2" value="{{ config.run_time.prep }}">
 <input type="time" name="booking" class="form-control mb-2" value="{{ config.run_time.booking }}">
 
-<button class="btn btn-dark w-100">Opslaan</button>
+<hr>
+
+<h6>📅 Speelmomenten</h6>
+
+{% set order = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'] %}
+{% set idx = namespace(value=0) %}
+
+{% for day in order %}
+  {% for rule in config.booking_rules %}
+    {% if rule.day == day %}
+
+    <div class="mb-2 p-2 border rounded">
+
+      <strong class="text-capitalize">{{ rule.day }}</strong>
+
+      <div class="row mt-1">
+        <div class="col-6">
+          <input type="time" name="times_{{ idx.value }}" class="form-control"
+                 value="{{ rule.times[0] }}">
+        </div>
+        <div class="col-6">
+          <input type="number" name="duration_{{ idx.value }}" class="form-control"
+                 value="{{ rule.duration }}">
+        </div>
+      </div>
+
+    </div>
+
+    {% set idx.value = idx.value + 1 %}
+
+    {% endif %}
+  {% endfor %}
+{% endfor %}
+
+<button class="btn btn-dark w-100">💾 Opslaan</button>
 
 </form>
 
@@ -76,7 +116,7 @@ body {
 
 <div class="d-flex justify-content-between mb-2">
 <h6>📅 Kalender</h6>
-<button onclick="fetchBookings()" class="btn btn-primary btn-sm">Sync</button>
+<button onclick="fetchBookings()" class="btn btn-primary btn-sm">📥 Sync</button>
 </div>
 
 <div id="calendar"></div>
@@ -91,8 +131,14 @@ body {
 <div class="modal fade" id="bookingModal">
 <div class="modal-dialog">
 <div class="modal-content p-3">
+
+<div class="d-flex justify-content-between">
 <h6 id="bookingTitle"></h6>
+<button class="btn-close" data-bs-dismiss="modal"></button>
+</div>
+
 <div id="bookingPlayers"></div>
+
 </div>
 </div>
 </div>
@@ -102,14 +148,17 @@ body {
 <div class="modal-dialog">
 <div class="modal-content p-3">
 
+<div class="d-flex justify-content-between">
 <h6 id="playerName"></h6>
+<button class="btn-close" data-bs-dismiss="modal"></button>
+</div>
 
 📞 <input id="playerPhone" class="form-control mb-2">
 
 <div id="playerRating"></div>
 <div id="playerPunctuality"></div>
 
-<button onclick="savePlayer()" class="btn btn-dark mt-2">Opslaan</button>
+<button onclick="savePlayer()" class="btn btn-dark mt-2">💾 Opslaan</button>
 
 </div>
 </div>
@@ -120,9 +169,7 @@ let chart
 let calendar
 let currentPlayerId=null
 
-// ─────────────────────────
-// STATUS + CHART (FIXED)
-// ─────────────────────────
+// STATUS + CHART
 async function loadStatus(){
   const res = await fetch("/api/status")
   const data = await res.json()
@@ -151,7 +198,10 @@ function updateChart(s,f,r){
       type:"doughnut",
       data:{
         labels:["Success","Failed","Running"],
-        datasets:[{data:[s,f,r]}]
+        datasets:[{
+          data:[s,f,r],
+          backgroundColor:["#28a745","#dc3545","#ffc107"]
+        }]
       }
     })
   }else{
@@ -160,9 +210,7 @@ function updateChart(s,f,r){
   }
 }
 
-// ─────────────────────────
-// LOGS (FIXED)
-// ─────────────────────────
+// LOGS
 async function loadLog(){
   const file=document.getElementById("logSelect").value
   if(!file) return
@@ -174,9 +222,7 @@ async function loadLog(){
     data.lines.map(l=>`<div>${l}</div>`).join("")
 }
 
-// ─────────────────────────
-// CALENDAR (FIXED)
-// ─────────────────────────
+// CALENDAR
 function formatISO(dateStr){
   const [d,m,yTime]=dateStr.split("-")
   const [y,time]=yTime.split(" ")
@@ -202,6 +248,8 @@ async function initCalendar(){
 
   calendar=new FullCalendar.Calendar(document.getElementById("calendar"),{
     initialView:"dayGridMonth",
+    height:"auto",
+    dayMaxEvents:true,
     events,
     eventClick:function(info){
       openBookingModal(info.event.extendedProps)
@@ -211,24 +259,20 @@ async function initCalendar(){
   calendar.render()
 }
 
-// ─────────────────────────
 // FETCH BOOKINGS
-// ─────────────────────────
 async function fetchBookings(){
   await fetch("/api/fetch_bookings")
   initCalendar()
 }
 
-// ─────────────────────────
-// MODALS (FIXED)
-// ─────────────────────────
+// MODALS
 function openBookingModal(b){
 
   document.getElementById("bookingTitle").innerText=b.datetime
 
   let html=""
   b.players.forEach(p=>{
-    html+=`<div onclick="openPlayerModal('${p.id}')">${p.name}</div>`
+    html+=`<div onclick="openPlayerModal('${p.id}')">🎾 ${p.name}</div>`
   })
 
   document.getElementById("bookingPlayers").innerHTML=html
@@ -252,9 +296,7 @@ async function openPlayerModal(id){
   new bootstrap.Modal(document.getElementById("playerModal")).show()
 }
 
-// ─────────────────────────
-// PLAYER SAVE (FIXED BUG)
-// ─────────────────────────
+// SAVE PLAYER
 function savePlayer(){
   fetch("/api/update_player",{
     method:"POST",
@@ -266,11 +308,11 @@ function savePlayer(){
       punctuality:window.currentPunctuality
     })
   })
+
+  bootstrap.Modal.getInstance(document.getElementById("playerModal")).hide()
 }
 
-// ─────────────────────────
-// RATING UI
-// ─────────────────────────
+// UI
 function renderRating(val){
   window.currentRating=val
   let html=""
@@ -289,9 +331,7 @@ function renderPunctuality(val){
   document.getElementById("playerPunctuality").innerHTML=html
 }
 
-// ─────────────────────────
-// INIT (HERSTELD)
-// ─────────────────────────
+// INIT
 setInterval(()=>{
   loadStatus()
   loadLog()
