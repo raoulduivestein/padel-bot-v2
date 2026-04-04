@@ -19,8 +19,6 @@ body {
   border-radius: 16px;
   box-shadow: 0 10px 30px rgba(0,0,0,0.08);
 }
-
-/* compacte kalender */
 .fc { font-size: 12px; }
 .fc-toolbar-title { font-size: 16px !important; }
 .fc-daygrid-event { padding: 2px 4px; font-size: 11px; }
@@ -31,7 +29,6 @@ body {
 
 <div class="container-fluid p-3">
 
-<!-- HEADER -->
 <div class="d-flex justify-content-between mb-3">
   <h5>🎾 Padel Bot</h5>
   <div>
@@ -78,7 +75,6 @@ body {
     </div>
 
     {% set idx.value = idx.value + 1 %}
-
     {% endif %}
   {% endfor %}
 {% endfor %}
@@ -167,7 +163,6 @@ let calendar
 let currentPlayerId=null
 let currentBooking=null
 
-// STATUS
 async function loadStatus(){
   const res = await fetch("/api/status")
   const data = await res.json()
@@ -208,7 +203,6 @@ function updateChart(s,f,r){
   }
 }
 
-// LOGS
 async function loadLog(){
   const file=document.getElementById("logSelect").value
   if(!file) return
@@ -220,7 +214,6 @@ async function loadLog(){
     data.lines.map(l=>`<div>${l}</div>`).join("")
 }
 
-// CALENDAR
 function formatISO(dateStr){
   const [d,m,yTime]=dateStr.split("-")
   const [y,time]=yTime.split(" ")
@@ -257,13 +250,11 @@ async function initCalendar(){
   calendar.render()
 }
 
-// FETCH BOOKINGS
 async function fetchBookings(){
   await fetch("/api/fetch_bookings")
   initCalendar()
 }
 
-// BOOKING MODAL
 async function openBookingModal(b){
 
   currentBooking = b
@@ -280,8 +271,13 @@ async function openBookingModal(b){
 
   if(b.players.length < 4){
 
-    const res = await fetch("/api/players_list")
-    const allPlayers = await res.json()
+    let allPlayers=[]
+    try{
+      const res = await fetch("/api/players_list")
+      allPlayers = await res.json()
+    }catch(e){
+      console.error(e)
+    }
 
     const existing = b.players.map(p=>p.id)
     const available = allPlayers.filter(p=>!existing.includes(p.id))
@@ -305,7 +301,6 @@ async function openBookingModal(b){
   new bootstrap.Modal(document.getElementById("bookingModal")).show()
 }
 
-// WHATSAPP
 function sendInvite(){
 
   const booking = currentBooking
@@ -320,10 +315,10 @@ function sendInvite(){
     return
   }
 
-  const spelers = booking.players.map(p => "🎾 " + p.name).join("\n")
+  const spelers = booking.players.map(p => `🎾 ${p.name}`).join("\n")
 
-  const message =
-`🎾 Padel uitnodiging
+  const message = `
+🎾 Padel uitnodiging
 
 📅 ${booking.datetime}
 📍 ${booking.court}
@@ -331,12 +326,14 @@ function sendInvite(){
 👥 Spelers:
 ${spelers}
 
-Speel je mee? 😄`
+Speel je mee? 😄
+`
 
-  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`)
+  const url = `https://wa.me/${phone}?text=${encodeURIComponent(message.trim())}`
+
+  window.open(url, "_blank")
 }
 
-// PLAYER
 async function openPlayerModal(id){
   currentPlayerId=id
 
@@ -368,7 +365,6 @@ function savePlayer(){
   bootstrap.Modal.getInstance(document.getElementById("playerModal")).hide()
 }
 
-// UI
 function renderRating(val){
   window.currentRating=val
   let html=""
@@ -387,7 +383,6 @@ function renderPunctuality(val){
   document.getElementById("playerPunctuality").innerHTML=html
 }
 
-// INIT
 setInterval(()=>{
   loadStatus()
   loadLog()
