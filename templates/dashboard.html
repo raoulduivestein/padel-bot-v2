@@ -8,6 +8,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <style>
 body {
@@ -16,10 +17,8 @@ body {
 }
 .card {
   border-radius: 16px;
-  border: none;
   box-shadow: 0 10px 30px rgba(0,0,0,0.08);
 }
-.day-header { cursor:pointer; font-weight:600; display:flex; justify-content:space-between; }
 </style>
 </head>
 
@@ -41,14 +40,17 @@ body {
 <!-- CONFIG -->
 <div class="col-lg-4">
 <div class="card p-3">
-<form id="configForm">
+
+<form id="configForm" method="POST" action="/update_config">
 
 <input name="days_ahead" class="form-control mb-2" value="{{ config.days_ahead }}">
 <input type="time" name="prep" class="form-control mb-2" value="{{ config.run_time.prep }}">
 <input type="time" name="booking" class="form-control mb-2" value="{{ config.run_time.booking }}">
 
 <button class="btn btn-dark w-100">Opslaan</button>
+
 </form>
+
 </div>
 </div>
 
@@ -63,7 +65,7 @@ body {
 <!-- LOGS -->
 <div class="col-lg-4">
 <div class="card p-3">
-<select id="logSelect" class="form-select"></select>
+<select id="logSelect" class="form-select mb-2"></select>
 <div id="liveLog" style="height:300px; overflow:auto;"></div>
 </div>
 </div>
@@ -114,9 +116,67 @@ body {
 </div>
 
 <script>
+let chart
 let calendar
-let currentPlayerId = null
+let currentPlayerId=null
 
+// ─────────────────────────
+// STATUS + CHART (FIXED)
+// ─────────────────────────
+async function loadStatus(){
+  const res = await fetch("/api/status")
+  const data = await res.json()
+
+  let success=0, failed=0, running=0
+  let html="", dropdown=""
+
+  data.forEach(r=>{
+    if(r.status==="success") success++
+    if(r.status==="failed") failed++
+    if(r.status==="running") running++
+
+    html+=`<div>${r.file} (${r.status})</div>`
+    dropdown+=`<option value="${r.file}">${r.file}</option>`
+  })
+
+  document.getElementById("statusList").innerHTML=html
+  document.getElementById("logSelect").innerHTML=dropdown
+
+  updateChart(success,failed,running)
+}
+
+function updateChart(s,f,r){
+  if(!chart){
+    chart=new Chart(document.getElementById("chart"),{
+      type:"doughnut",
+      data:{
+        labels:["Success","Failed","Running"],
+        datasets:[{data:[s,f,r]}]
+      }
+    })
+  }else{
+    chart.data.datasets[0].data=[s,f,r]
+    chart.update()
+  }
+}
+
+// ─────────────────────────
+// LOGS (FIXED)
+// ─────────────────────────
+async function loadLog(){
+  const file=document.getElementById("logSelect").value
+  if(!file) return
+
+  const res=await fetch(`/api/log/${file}`)
+  const data=await res.json()
+
+  document.getElementById("liveLog").innerHTML=
+    data.lines.map(l=>`<div>${l}</div>`).join("")
+}
+
+// ─────────────────────────
+// CALENDAR (FIXED)
+// ─────────────────────────
 function formatISO(dateStr){
   const [d,m,yTime]=dateStr.split("-")
   const [y,time]=yTime.split(" ")
@@ -124,20 +184,26 @@ function formatISO(dateStr){
 }
 
 async function initCalendar(){
-  const res = await fetch("/api/bookings")
-  const bookings = await res.json()
+  const res=await fetch("/api/bookings")
+  const bookings=await res.json()
 
-  const events = bookings.map(b=>({
-    title: b.court,
-    start: formatISO(b.datetime),
-    color: b.status==="confirmed"?"#28a745":"#ffc107",
+  const events=bookings.map(b=>({
+    title:b.court,
+    start:formatISO(b.datetime),
+    color:b.status==="confirmed"?"#28a745":"#ffc107",
     extendedProps:b
   }))
 
-  calendar = new FullCalendar.Calendar(document.getElementById("calendar"),{
+  if(calendar){
+    calendar.removeAllEvents()
+    calendar.addEventSource(events)
+    return
+  }
+
+  calendar=new FullCalendar.Calendar(document.getElementById("calendar"),{
     initialView:"dayGridMonth",
     events,
-    eventClick: function(info){
+    eventClick:function(info){
       openBookingModal(info.event.extendedProps)
     }
   })
@@ -145,45 +211,66 @@ async function initCalendar(){
   calendar.render()
 }
 
+// ─────────────────────────
+// FETCH BOOKINGS
+// ─────────────────────────
 async function fetchBookings(){
   await fetch("/api/fetch_bookings")
   initCalendar()
 }
 
-async function openBookingModal(b){
+// ─────────────────────────
+// MODALS (FIXED)
+// ─────────────────────────
+function openBookingModal(b){
 
-  document.getElementById("bookingTitle").innerText = b.datetime
+  document.getElementById("bookingTitle").innerText=b.datetime
 
   let html=""
-
   b.players.forEach(p=>{
-    html+=`<div onclick="openPlayerModal('${p.id}')" style="cursor:pointer">
-      🎾 ${p.name}
-    </div>`
+    html+=`<div onclick="openPlayerModal('${p.id}')">${p.name}</div>`
   })
 
-  document.getElementById("bookingPlayers").innerHTML = html
+  document.getElementById("bookingPlayers").innerHTML=html
 
   new bootstrap.Modal(document.getElementById("bookingModal")).show()
 }
 
 async function openPlayerModal(id){
-
   currentPlayerId=id
 
-  const res = await fetch("/api/players")
-  const players = await res.json()
-  const p = players[id]
+  const res=await fetch("/api/players")
+  const players=await res.json()
+  const p=players[id]
 
-  document.getElementById("playerName").innerText = p.name
-  document.getElementById("playerPhone").value = p.phone || ""
+  document.getElementById("playerName").innerText=p.name
+  document.getElementById("playerPhone").value=p.phone||""
 
-  renderRating(p.rating || 3)
-  renderPunctuality(p.punctuality || 3)
+  renderRating(p.rating||3)
+  renderPunctuality(p.punctuality||3)
 
   new bootstrap.Modal(document.getElementById("playerModal")).show()
 }
 
+// ─────────────────────────
+// PLAYER SAVE (FIXED BUG)
+// ─────────────────────────
+function savePlayer(){
+  fetch("/api/update_player",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+      id:currentPlayerId,
+      phone:document.getElementById("playerPhone").value,
+      rating:window.currentRating,
+      punctuality:window.currentPunctuality
+    })
+  })
+}
+
+// ─────────────────────────
+// RATING UI
+// ─────────────────────────
 function renderRating(val){
   window.currentRating=val
   let html=""
@@ -202,19 +289,15 @@ function renderPunctuality(val){
   document.getElementById("playerPunctuality").innerHTML=html
 }
 
-function savePlayer(){
-  fetch("/api/update_player",{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({
-      id:currentPlayerId,
-      phone:document.getElementById("playerPhone").value,
-      rating:window.currentRating,
-      punctuality:window.currentPunctuality
-    })
-  })
-}
+// ─────────────────────────
+// INIT (HERSTELD)
+// ─────────────────────────
+setInterval(()=>{
+  loadStatus()
+  loadLog()
+},2000)
 
+loadStatus()
 initCalendar()
 </script>
 
