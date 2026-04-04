@@ -2,19 +2,6 @@ from flask import Flask, render_template, request, redirect, session
 import os
 import json
 import subprocess
-
-app = Flask(__name__)
-app.secret_key = "secret"
-
-CONFIG_FILE = "config.json"
-LOG_DIR = "logs"
-STATUS_DIR = "status"
-
-USERNAME = "admin"
-PASSWORD = "padel123"from flask import Flask, render_template, request, redirect, session
-import os
-import json
-import subprocess
 import requests
 from datetime import datetime
 
