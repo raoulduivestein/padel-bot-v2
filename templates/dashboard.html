@@ -165,6 +165,7 @@ body {
 let chart
 let calendar
 let currentPlayerId=null
+let currentBooking=null
 
 // STATUS
 async function loadStatus(){
@@ -262,10 +263,13 @@ async function fetchBookings(){
   initCalendar()
 }
 
-// BOOKING MODAL + INVITE
+// BOOKING MODAL
 async function openBookingModal(b){
 
-  document.getElementById("bookingTitle").innerText = `${b.datetime} - ${b.court}`
+  currentBooking = b
+
+  document.getElementById("bookingTitle").innerText =
+    `${b.datetime} - ${b.court}`
 
   let html=""
   b.players.forEach(p=>{
@@ -290,7 +294,7 @@ async function openBookingModal(b){
     document.getElementById("inviteSection").innerHTML = `
       <hr>
       <select id="invitePlayer" class="form-select mb-2">${options}</select>
-      <button onclick='sendInvite(${JSON.stringify(b)})' class="btn btn-success w-100">
+      <button onclick="sendInvite()" class="btn btn-success w-100">
         📲 WhatsApp uitnodigen
       </button>
     `
@@ -302,18 +306,21 @@ async function openBookingModal(b){
 }
 
 // WHATSAPP
-function sendInvite(booking){
+function sendInvite(){
+
+  const booking = currentBooking
 
   const select = document.getElementById("invitePlayer")
   const option = select.options[select.selectedIndex]
 
   const phone = option.dataset.phone
+
   if(!phone){
-    alert("Geen telefoonnummer")
+    alert("Geen telefoonnummer bekend")
     return
   }
 
-  const spelers = booking.players.map(p=>"🎾 "+p.name).join("\n")
+  const spelers = booking.players.map(p => "🎾 " + p.name).join("\n")
 
   const message =
 `🎾 Padel uitnodiging
