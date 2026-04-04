@@ -15,7 +15,6 @@ body {
   font-family: 'Inter', sans-serif;
   background: linear-gradient(135deg, #f5f7fa, #e4ecf3);
 }
-
 .card {
   border-radius: 16px;
   box-shadow: 0 10px 30px rgba(0,0,0,0.08);
@@ -47,14 +46,13 @@ body {
 <div class="col-lg-4">
 <div class="card p-3">
 
-<form id="configForm" method="POST" action="/update_config">
+<form method="POST" action="/update_config">
 
 <input name="days_ahead" class="form-control mb-2" value="{{ config.days_ahead }}">
 <input type="time" name="prep" class="form-control mb-2" value="{{ config.run_time.prep }}">
 <input type="time" name="booking" class="form-control mb-2" value="{{ config.run_time.booking }}">
 
 <hr>
-
 <h6>📅 Speelmomenten</h6>
 
 {% set order = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'] %}
@@ -65,7 +63,6 @@ body {
     {% if rule.day == day %}
 
     <div class="mb-2 p-2 border rounded">
-
       <strong class="text-capitalize">{{ rule.day }}</strong>
 
       <div class="row mt-1">
@@ -78,7 +75,6 @@ body {
                  value="{{ rule.duration }}">
         </div>
       </div>
-
     </div>
 
     {% set idx.value = idx.value + 1 %}
@@ -138,6 +134,7 @@ body {
 </div>
 
 <div id="bookingPlayers"></div>
+<div id="inviteSection"></div>
 
 </div>
 </div>
@@ -169,7 +166,7 @@ let chart
 let calendar
 let currentPlayerId=null
 
-// STATUS + CHART
+// STATUS
 async function loadStatus(){
   const res = await fetch("/api/status")
   const data = await res.json()
@@ -265,10 +262,10 @@ async function fetchBookings(){
   initCalendar()
 }
 
-// MODALS
-function openBookingModal(b){
+// BOOKING MODAL + INVITE
+async function openBookingModal(b){
 
-  document.getElementById("bookingTitle").innerText=b.datetime
+  document.getElementById("bookingTitle").innerText = `${b.datetime} - ${b.court}`
 
   let html=""
   b.players.forEach(p=>{
@@ -277,9 +274,62 @@ function openBookingModal(b){
 
   document.getElementById("bookingPlayers").innerHTML=html
 
+  if(b.players.length < 4){
+
+    const res = await fetch("/api/players_list")
+    const allPlayers = await res.json()
+
+    const existing = b.players.map(p=>p.id)
+    const available = allPlayers.filter(p=>!existing.includes(p.id))
+
+    let options = available.map(p =>
+      `<option value="${p.id}" data-phone="${p.phone}">
+        ${p.name}
+      </option>`).join("")
+
+    document.getElementById("inviteSection").innerHTML = `
+      <hr>
+      <select id="invitePlayer" class="form-select mb-2">${options}</select>
+      <button onclick='sendInvite(${JSON.stringify(b)})' class="btn btn-success w-100">
+        📲 WhatsApp uitnodigen
+      </button>
+    `
+  } else {
+    document.getElementById("inviteSection").innerHTML=""
+  }
+
   new bootstrap.Modal(document.getElementById("bookingModal")).show()
 }
 
+// WHATSAPP
+function sendInvite(booking){
+
+  const select = document.getElementById("invitePlayer")
+  const option = select.options[select.selectedIndex]
+
+  const phone = option.dataset.phone
+  if(!phone){
+    alert("Geen telefoonnummer")
+    return
+  }
+
+  const spelers = booking.players.map(p=>"🎾 "+p.name).join("\n")
+
+  const message =
+`🎾 Padel uitnodiging
+
+📅 ${booking.datetime}
+📍 ${booking.court}
+
+👥 Spelers:
+${spelers}
+
+Speel je mee? 😄`
+
+  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`)
+}
+
+// PLAYER
 async function openPlayerModal(id){
   currentPlayerId=id
 
@@ -296,7 +346,6 @@ async function openPlayerModal(id){
   new bootstrap.Modal(document.getElementById("playerModal")).show()
 }
 
-// SAVE PLAYER
 function savePlayer(){
   fetch("/api/update_player",{
     method:"POST",
