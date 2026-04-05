@@ -202,6 +202,47 @@ def logout():
     session.clear()
     return redirect("/")
 
+# ---------------- STATUS ----------------
+@app.route("/api/status")
+def api_status():
+
+    STATUS_DIR = "status"
+
+    if not os.path.exists(STATUS_DIR):
+        return []
+
+    files = sorted(os.listdir(STATUS_DIR), reverse=True)
+
+    result = []
+
+    for f in files:
+        try:
+            data = json.load(open(f"{STATUS_DIR}/{f}"))
+        except:
+            continue
+
+        result.append({
+            "file": f.replace(".json", ".log"),
+            "status": data.get("status", "unknown")
+        })
+
+    return result
+
+
+# ---------------- LOGS ----------------
+@app.route("/api/log/<filename>")
+def api_log(filename):
+
+    LOG_DIR = "logs"
+    path = f"{LOG_DIR}/{filename}"
+
+    if not os.path.exists(path):
+        return {"lines": []}
+
+    with open(path, encoding="utf-8") as f:
+        lines = f.readlines()[-100:]
+
+    return {"lines": lines}
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
