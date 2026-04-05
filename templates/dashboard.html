@@ -41,12 +41,78 @@ body {
 <!-- CONFIG -->
 <div class="col-lg-4">
 <div class="card p-3">
-<form method="POST" action="/update_config">
-<input name="days_ahead" class="form-control mb-2" value="{{ config.days_ahead }}">
-<input type="time" name="prep" class="form-control mb-2" value="{{ config.run_time.prep }}">
-<input type="time" name="booking" class="form-control mb-2" value="{{ config.run_time.booking }}">
-<button class="btn btn-dark w-100">💾 Opslaan</button>
+
+<h6 class="mb-3">⚙️ Config</h6>
+
+<form id="configForm" method="POST" action="/update_config">
+
+  <div class="row g-2 mb-3">
+    <div class="col-4">
+      <label class="small">Days</label>
+      <input name="days_ahead" class="form-control" value="{{ config.days_ahead }}">
+    </div>
+
+    <div class="col-4">
+      <label class="small">Prep</label>
+      <input type="time" name="prep" class="form-control" value="{{ config.run_time.prep }}">
+    </div>
+
+    <div class="col-4">
+      <label class="small">Book</label>
+      <input type="time" name="booking" class="form-control" value="{{ config.run_time.booking }}">
+    </div>
+  </div>
+
+  <hr>
+  <h6 class="mb-2">📅 Speelmomenten</h6>
+
+  {% set order = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'] %}
+  {% set idx = namespace(value=0) %}
+
+  {% for day in order %}
+    {% for rule in config.booking_rules %}
+      {% if rule.day == day %}
+
+      <div class="mb-2 p-2 border rounded">
+
+        <div class="d-flex justify-content-between align-items-center">
+          <strong class="text-capitalize">{{ rule.day }}</strong>
+        </div>
+
+        <div class="row g-2 mt-1">
+
+          <div class="col-6">
+            <label class="small">Start</label>
+            <input
+              type="time"
+              name="times_{{ idx.value }}"
+              class="form-control"
+              value="{{ rule.times[0] }}">
+          </div>
+
+          <div class="col-6">
+            <label class="small">Minuten</label>
+            <input
+              type="number"
+              name="duration_{{ idx.value }}"
+              class="form-control"
+              value="{{ rule.duration }}">
+          </div>
+
+        </div>
+
+      </div>
+
+      {% set idx.value = idx.value + 1 %}
+
+      {% endif %}
+    {% endfor %}
+  {% endfor %}
+
+  <button class="btn btn-dark w-100 mt-2">💾 Opslaan</button>
+
 </form>
+
 </div>
 </div>
 
