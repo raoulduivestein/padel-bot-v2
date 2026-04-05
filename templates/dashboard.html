@@ -1,396 +1,746 @@
 <!DOCTYPE html>
-<html>
+<html lang="nl">
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
+  <title>Padel Bot Dashboard</title>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 
-<style>
-body {
-  font-family: 'Inter', sans-serif;
-  background: linear-gradient(135deg, #f5f7fa, #e4ecf3);
-}
-.card {
-  border-radius: 16px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
-}
-.fc { font-size: 12px; }
-.fc-toolbar-title { font-size: 16px !important; }
-.fc-daygrid-event { padding: 2px 4px; font-size: 11px; }
-</style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #f5f7fa, #e4ecf3);
+    }
+
+    .card {
+      border-radius: 16px;
+      border: none;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+    }
+
+    .form-control, .form-select {
+      border-radius: 10px;
+    }
+
+    .config-day-card {
+      background: #f9fafb;
+      border-radius: 12px;
+      padding: 10px;
+      border: 1px solid #edf1f5;
+    }
+
+    .toast-modern {
+      border-radius: 12px;
+      padding: 12px;
+      color: white;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+      animation: slideIn 0.3s ease;
+    }
+
+    .toast-success { background: #28a745; }
+    .toast-error   { background: #dc3545; }
+    .toast-running { background: #ffc107; color: black; }
+
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to   { transform: translateX(0); opacity: 1; }
+    }
+
+    .fc {
+      font-size: 12px;
+    }
+
+    .fc .fc-toolbar-title {
+      font-size: 16px !important;
+      font-weight: 600;
+    }
+
+    .fc .fc-button {
+      padding: 4px 8px;
+      font-size: 12px;
+      border-radius: 8px;
+    }
+
+    .fc-daygrid-event {
+      padding: 2px 4px;
+      font-size: 11px;
+      border-radius: 6px;
+    }
+
+    .fc .fc-daygrid-day-number {
+      font-size: 12px;
+    }
+
+    .player-link {
+      cursor: pointer;
+      padding: 8px 10px;
+      border-radius: 10px;
+      background: #f9fafb;
+      border: 1px solid #edf1f5;
+      margin-bottom: 8px;
+    }
+
+    .player-link:hover {
+      background: #eef4ff;
+    }
+
+    .icon-score {
+      font-size: 22px;
+      cursor: pointer;
+      user-select: none;
+      margin-right: 2px;
+    }
+
+    .modal-content {
+      border: none;
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+    }
+
+    #liveLog {
+      background: #000;
+      color: #22c55e;
+      border-radius: 10px;
+      padding: 10px;
+      height: 300px;
+      overflow: auto;
+      font-size: 12px;
+    }
+  </style>
 </head>
 
 <body>
-
 <div class="container-fluid p-3">
 
-<div class="d-flex justify-content-between mb-3">
-  <h5>🎾 Padel Bot</h5>
-  <div>
-    <a href="/run_now" class="btn btn-success btn-sm">🚀 Run</a>
-    <a href="/logout" class="btn btn-danger btn-sm">Logout</a>
+  <!-- HEADER -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h5 class="mb-0">🎾 Padel Bot</h5>
+      <small class="text-muted">Dashboard</small>
+    </div>
+
+    <div class="d-flex gap-2">
+      <a href="/run_now" class="btn btn-success btn-sm">🚀 Run</a>
+      <a href="/logout" class="btn btn-outline-danger btn-sm">Logout</a>
+    </div>
   </div>
-</div>
 
-<div class="row g-3">
+  <div class="row g-3">
 
-<!-- CONFIG -->
-<div class="col-lg-4">
-<div class="card p-3">
+    <!-- CONFIG -->
+    <div class="col-12 col-lg-4">
+      <div class="card p-3">
+        <h6 class="mb-3">⚙️ Config</h6>
 
-<form method="POST" action="/update_config">
+        <form id="configForm" method="POST" action="/update_config">
 
-<input name="days_ahead" class="form-control mb-2" value="{{ config.days_ahead }}">
-<input type="time" name="prep" class="form-control mb-2" value="{{ config.run_time.prep }}">
-<input type="time" name="booking" class="form-control mb-2" value="{{ config.run_time.booking }}">
+          <div class="row g-2 mb-3">
+            <div class="col-4">
+              <label class="small">Days</label>
+              <input name="days_ahead" class="form-control" value="{{ config.days_ahead }}">
+            </div>
 
-<hr>
-<h6>📅 Speelmomenten</h6>
+            <div class="col-4">
+              <label class="small">Prep</label>
+              <input type="time" name="prep" class="form-control" value="{{ config.run_time.prep }}">
+            </div>
 
-{% set order = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'] %}
-{% set idx = namespace(value=0) %}
+            <div class="col-4">
+              <label class="small">Book</label>
+              <input type="time" name="booking" class="form-control" value="{{ config.run_time.booking }}">
+            </div>
+          </div>
 
-{% for day in order %}
-  {% for rule in config.booking_rules %}
-    {% if rule.day == day %}
+          <hr>
+          <h6 class="mb-2">📅 Speelmomenten</h6>
 
-    <div class="mb-2 p-2 border rounded">
-      <strong class="text-capitalize">{{ rule.day }}</strong>
+          {% set order = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'] %}
+          {% set idx = namespace(value=0) %}
 
-      <div class="row mt-1">
-        <div class="col-6">
-          <input type="time" name="times_{{ idx.value }}" class="form-control"
-                 value="{{ rule.times[0] }}">
-        </div>
-        <div class="col-6">
-          <input type="number" name="duration_{{ idx.value }}" class="form-control"
-                 value="{{ rule.duration }}">
-        </div>
+          {% for day in order %}
+            {% for rule in config.booking_rules %}
+              {% if rule.day == day %}
+                <div class="config-day-card mb-2">
+                  <div class="fw-semibold text-capitalize mb-2">{{ rule.day }}</div>
+
+                  <div class="row g-2">
+                    <div class="col-6">
+                      <label class="small">Start</label>
+                      <input
+                        type="time"
+                        name="times_{{ idx.value }}"
+                        class="form-control"
+                        value="{{ rule.times[0] }}"
+                      >
+                    </div>
+
+                    <div class="col-6">
+                      <label class="small">Minuten</label>
+                      <input
+                        type="number"
+                        name="duration_{{ idx.value }}"
+                        class="form-control"
+                        value="{{ rule.duration }}"
+                      >
+                    </div>
+                  </div>
+                </div>
+
+                {% set idx.value = idx.value + 1 %}
+              {% endif %}
+            {% endfor %}
+          {% endfor %}
+
+          <button class="btn btn-dark w-100 mt-2">💾 Opslaan</button>
+        </form>
       </div>
     </div>
 
-    {% set idx.value = idx.value + 1 %}
-    {% endif %}
-  {% endfor %}
-{% endfor %}
+    <!-- STATS -->
+    <div class="col-12 col-lg-4">
+      <div class="card p-3">
+        <h6 class="mb-3">📊 Statistieken</h6>
+        <canvas id="chart"></canvas>
+        <div id="statusList" class="mt-3 small"></div>
+      </div>
+    </div>
 
-<button class="btn btn-dark w-100">💾 Opslaan</button>
+    <!-- LOGS -->
+    <div class="col-12 col-lg-4">
+      <div class="card p-3">
+        <h6 class="mb-3">📄 Logs</h6>
+        <select id="logSelect" class="form-select mb-2"></select>
+        <div id="liveLog"></div>
+      </div>
+    </div>
 
-</form>
+    <!-- CALENDAR -->
+    <div class="col-12">
+      <div class="card p-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="mb-0">📅 Kalender</h6>
+          <button onclick="fetchBookings()" class="btn btn-primary btn-sm">📥 Sync</button>
+        </div>
 
-</div>
-</div>
+        <div id="calendar"></div>
+      </div>
+    </div>
 
-<!-- STATS -->
-<div class="col-lg-4">
-<div class="card p-3">
-<canvas id="chart"></canvas>
-<div id="statusList"></div>
-</div>
-</div>
-
-<!-- LOGS -->
-<div class="col-lg-4">
-<div class="card p-3">
-<select id="logSelect" class="form-select mb-2"></select>
-<div id="liveLog" style="height:300px; overflow:auto;"></div>
-</div>
-</div>
-
-<!-- CALENDAR -->
-<div class="col-12">
-<div class="card p-3">
-
-<div class="d-flex justify-content-between mb-2">
-<h6>📅 Kalender</h6>
-<button onclick="fetchBookings()" class="btn btn-primary btn-sm">📥 Sync</button>
-</div>
-
-<div id="calendar"></div>
-
-</div>
-</div>
-
-</div>
+  </div>
 </div>
 
 <!-- BOOKING MODAL -->
-<div class="modal fade" id="bookingModal">
-<div class="modal-dialog">
-<div class="modal-content p-3">
+<div class="modal fade" id="bookingModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content p-3">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h6 id="bookingTitle" class="mb-0"></h6>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
 
-<div class="d-flex justify-content-between">
-<h6 id="bookingTitle"></h6>
-<button class="btn-close" data-bs-dismiss="modal"></button>
-</div>
-
-<div id="bookingPlayers"></div>
-<div id="inviteSection"></div>
-
-</div>
-</div>
+      <div id="bookingMeta" class="small text-muted mb-3"></div>
+      <div id="bookingPlayers"></div>
+      <div id="inviteSection" class="mt-3"></div>
+    </div>
+  </div>
 </div>
 
 <!-- PLAYER MODAL -->
-<div class="modal fade" id="playerModal">
-<div class="modal-dialog">
-<div class="modal-content p-3">
+<div class="modal fade" id="playerModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content p-3">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h6 id="playerName" class="mb-0"></h6>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
 
-<div class="d-flex justify-content-between">
-<h6 id="playerName"></h6>
-<button class="btn-close" data-bs-dismiss="modal"></button>
+      <label class="small mb-1">Telefoonnummer</label>
+      <input id="playerPhone" class="form-control mb-3" placeholder="31612345678">
+
+      <div class="mb-3">
+        <div class="small mb-1">Niveau</div>
+        <div id="playerRating"></div>
+      </div>
+
+      <div class="mb-3">
+        <div class="small mb-1">Op tijd</div>
+        <div id="playerPunctuality"></div>
+      </div>
+
+      <button onclick="savePlayer()" class="btn btn-dark mt-2">💾 Opslaan</button>
+    </div>
+  </div>
 </div>
 
-📞 <input id="playerPhone" class="form-control mb-2">
-
-<div id="playerRating"></div>
-<div id="playerPunctuality"></div>
-
-<button onclick="savePlayer()" class="btn btn-dark mt-2">💾 Opslaan</button>
-
-</div>
-</div>
-</div>
+<!-- TOAST -->
+<div id="toastContainer" class="position-fixed bottom-0 end-0 p-3"></div>
 
 <script>
-let chart
-let calendar
-let currentPlayerId=null
-let currentBooking=null
+  let chart = null
+  let calendar = null
+  let currentPlayerId = null
+  let currentBooking = null
+  let lastStatus = JSON.parse(localStorage.getItem("lastStatus") || "{}")
 
-async function loadStatus(){
-  const res = await fetch("/api/status")
-  const data = await res.json()
+  function showToast(message, type = "info") {
+    const map = {
+      success: "toast-success",
+      failed: "toast-error",
+      running: "toast-running"
+    }
 
-  let success=0, failed=0, running=0
-  let html="", dropdown=""
+    const toast = document.createElement("div")
+    toast.className = `toast-modern ${map[type] || ""} mb-2`
+    toast.innerHTML = message
 
-  data.forEach(r=>{
-    if(r.status==="success") success++
-    if(r.status==="failed") failed++
-    if(r.status==="running") running++
+    document.getElementById("toastContainer").appendChild(toast)
+    setTimeout(() => toast.remove(), 4000)
+  }
 
-    html+=`<div>${r.file} (${r.status})</div>`
-    dropdown+=`<option value="${r.file}">${r.file}</option>`
-  })
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;")
+  }
 
-  document.getElementById("statusList").innerHTML=html
-  document.getElementById("logSelect").innerHTML=dropdown
+  function normalizePhone(phone) {
+    return String(phone || "").replace(/\D/g, "")
+  }
 
-  updateChart(success,failed,running)
-}
+  function parseLocalDateTime(datetimeStr) {
+    const [datePart, timePart] = String(datetimeStr).split(" ")
+    const [d, m, y] = datePart.split("-").map(Number)
+    const [hh, mm] = timePart.split(":").map(Number)
+    return new Date(y, m - 1, d, hh, mm, 0, 0)
+  }
 
-function updateChart(s,f,r){
-  if(!chart){
-    chart=new Chart(document.getElementById("chart"),{
-      type:"doughnut",
-      data:{
-        labels:["Success","Failed","Running"],
-        datasets:[{
-          data:[s,f,r],
-          backgroundColor:["#28a745","#dc3545","#ffc107"]
-        }]
+  function formatISO(datetimeStr) {
+    const dt = parseLocalDateTime(datetimeStr)
+    const year = dt.getFullYear()
+    const month = String(dt.getMonth() + 1).padStart(2, "0")
+    const day = String(dt.getDate()).padStart(2, "0")
+    const hours = String(dt.getHours()).padStart(2, "0")
+    const minutes = String(dt.getMinutes()).padStart(2, "0")
+    return `${year}-${month}-${day}T${hours}:${minutes}:00`
+  }
+
+  function formatDutch(datetimeStr) {
+    const dt = parseLocalDateTime(datetimeStr)
+    const weekdays = [
+      "zondag", "maandag", "dinsdag", "woensdag",
+      "donderdag", "vrijdag", "zaterdag"
+    ]
+    const dayName = weekdays[dt.getDay()]
+    const day = dt.getDate()
+    const month = dt.getMonth() + 1
+    const hours = String(dt.getHours()).padStart(2, "0")
+    const minutes = String(dt.getMinutes()).padStart(2, "0")
+    return `${dayName} ${day}-${month} ${hours}:${minutes}`
+  }
+
+  function samePlayers(playersA, playersB) {
+    if (!Array.isArray(playersA) || !Array.isArray(playersB)) return false
+    if (playersA.length !== playersB.length) return false
+
+    const idsA = playersA.map(p => p.id).sort()
+    const idsB = playersB.map(p => p.id).sort()
+
+    return JSON.stringify(idsA) === JSON.stringify(idsB)
+  }
+
+  function mergeBookings(bookings) {
+    const list = [...bookings].sort((a, b) => {
+      return parseLocalDateTime(a.datetime) - parseLocalDateTime(b.datetime)
+    })
+
+    const merged = []
+
+    for (const booking of list) {
+      const duration = Number(booking.duration || 60)
+      const current = {
+        ...booking,
+        duration,
+        merged_count: 1
+      }
+
+      const last = merged[merged.length - 1]
+
+      if (!last) {
+        merged.push(current)
+        continue
+      }
+
+      const lastStart = parseLocalDateTime(last.datetime)
+      const lastEnd = new Date(lastStart.getTime() + (Number(last.duration || 0) * 60000))
+      const currentStart = parseLocalDateTime(current.datetime)
+
+      const sameCourt = last.court === current.court
+      const sameStatus = last.status === current.status
+      const playersMatch = samePlayers(last.players, current.players)
+      const directlyAfter = lastEnd.getTime() === currentStart.getTime()
+
+      if (sameCourt && sameStatus && playersMatch && directlyAfter) {
+        last.duration = Number(last.duration || 0) + Number(current.duration || 0)
+        last.merged_count = Number(last.merged_count || 1) + 1
+      } else {
+        merged.push(current)
+      }
+    }
+
+    return merged
+  }
+
+  async function loadStatus() {
+    const res = await fetch("/api/status")
+    const data = await res.json()
+
+    let success = 0
+    let failed = 0
+    let running = 0
+    let html = ""
+    let dropdown = ""
+
+    data.forEach(r => {
+      if (r.status === "success") success++
+      if (r.status === "failed") failed++
+      if (r.status === "running") running++
+
+      if (!lastStatus[r.file]) {
+        if (r.status === "running") showToast("🚀 Run gestart", "running")
+        if (r.status === "success") showToast("✅ Run succesvol", "success")
+        if (r.status === "failed") showToast("❌ Run gefaald", "failed")
+      } else if (lastStatus[r.file] !== r.status) {
+        if (r.status === "success") showToast("✅ Run succesvol", "success")
+        if (r.status === "failed") showToast("❌ Run gefaald", "failed")
+      }
+
+      lastStatus[r.file] = r.status
+
+      html += `<div>${escapeHtml(r.file)} (${escapeHtml(r.status)})</div>`
+      dropdown += `<option value="${escapeHtml(r.file)}">${escapeHtml(r.file)}</option>`
+    })
+
+    localStorage.setItem("lastStatus", JSON.stringify(lastStatus))
+
+    document.getElementById("statusList").innerHTML = html
+
+    const select = document.getElementById("logSelect")
+    const prev = select.value
+    select.innerHTML = dropdown
+
+    if (data.length > 0) {
+      const newest = data[0].file
+      if (!prev || !data.some(x => x.file === prev)) {
+        select.value = newest
+      } else {
+        select.value = prev
+      }
+    }
+
+    updateChart(success, failed, running)
+  }
+
+  function updateChart(success, failed, running) {
+    if (!chart) {
+      chart = new Chart(document.getElementById("chart"), {
+        type: "doughnut",
+        data: {
+          labels: ["Success", "Failed", "Running"],
+          datasets: [{
+            data: [success, failed, running],
+            backgroundColor: ["#28a745", "#dc3545", "#ffc107"]
+          }]
+        }
+      })
+    } else {
+      chart.data.datasets[0].data = [success, failed, running]
+      chart.update()
+    }
+  }
+
+  async function loadLog() {
+    const file = document.getElementById("logSelect").value
+    if (!file) return
+
+    const res = await fetch(`/api/log/${encodeURIComponent(file)}`)
+    const data = await res.json()
+
+    const el = document.getElementById("liveLog")
+    el.innerHTML = data.lines.map(l => `<div>${escapeHtml(l)}</div>`).join("")
+    el.scrollTop = el.scrollHeight
+  }
+
+  async function initCalendar() {
+    const res = await fetch("/api/bookings")
+    const bookingsRaw = await res.json()
+    const bookings = mergeBookings(bookingsRaw)
+
+    const events = bookings.map(b => ({
+      title: `${b.court} · ${b.duration} min`,
+      start: formatISO(b.datetime),
+      end: new Date(parseLocalDateTime(b.datetime).getTime() + (Number(b.duration || 60) * 60000)).toISOString(),
+      color: b.status === "confirmed" ? "#28a745" : "#ffc107",
+      extendedProps: b
+    }))
+
+    if (calendar) {
+      calendar.removeAllEvents()
+      calendar.addEventSource(events)
+      return
+    }
+
+    calendar = new FullCalendar.Calendar(document.getElementById("calendar"), {
+      initialView: "dayGridMonth",
+      firstDay: 1,
+      locale: "nl",
+      height: "auto",
+      dayMaxEvents: true,
+      events,
+      headerToolbar: {
+        left: "prev,next today",
+        center: "title",
+        right: "dayGridMonth,timeGridWeek"
+      },
+      buttonText: {
+        today: "Vandaag",
+        month: "Maand",
+        week: "Week"
+      },
+      eventClick: function(info) {
+        openBookingModal(info.event.extendedProps)
       }
     })
-  }else{
-    chart.data.datasets[0].data=[s,f,r]
-    chart.update()
-  }
-}
 
-async function loadLog(){
-  const file=document.getElementById("logSelect").value
-  if(!file) return
-
-  const res=await fetch(`/api/log/${file}`)
-  const data=await res.json()
-
-  document.getElementById("liveLog").innerHTML=
-    data.lines.map(l=>`<div>${l}</div>`).join("")
-}
-
-function formatISO(dateStr){
-  const [d,m,yTime]=dateStr.split("-")
-  const [y,time]=yTime.split(" ")
-  return `${y}-${m}-${d}T${time}`
-}
-
-async function initCalendar(){
-  const res=await fetch("/api/bookings")
-  const bookings=await res.json()
-
-  const events=bookings.map(b=>({
-    title:b.court,
-    start:formatISO(b.datetime),
-    color:b.status==="confirmed"?"#28a745":"#ffc107",
-    extendedProps:b
-  }))
-
-  if(calendar){
-    calendar.removeAllEvents()
-    calendar.addEventSource(events)
-    return
+    calendar.render()
   }
 
-  calendar=new FullCalendar.Calendar(document.getElementById("calendar"),{
-    initialView:"dayGridMonth",
-    height:"auto",
-    dayMaxEvents:true,
-    events,
-    eventClick:function(info){
-      openBookingModal(info.event.extendedProps)
+  async function fetchBookings() {
+    try {
+      showToast("📥 Boekingen ophalen...", "running")
+      const res = await fetch("/api/fetch_bookings")
+      const data = await res.json()
+
+      if (data.status === "success") {
+        showToast("✅ Boekingen opgehaald", "success")
+        await initCalendar()
+      } else {
+        showToast("❌ Fout bij ophalen", "failed")
+      }
+    } catch (e) {
+      showToast("❌ Fout bij ophalen", "failed")
     }
-  })
-
-  calendar.render()
-}
-
-async function fetchBookings(){
-  await fetch("/api/fetch_bookings")
-  initCalendar()
-}
-
-async function openBookingModal(b){
-
-  currentBooking = b
-
-  document.getElementById("bookingTitle").innerText =
-    `${b.datetime} - ${b.court}`
-
-  let html=""
-  b.players.forEach(p=>{
-    html+=`<div onclick="openPlayerModal('${p.id}')">🎾 ${p.name}</div>`
-  })
-
-  document.getElementById("bookingPlayers").innerHTML=html
-
-  if(b.players.length < 4){
-
-    let allPlayers=[]
-    try{
-      const res = await fetch("/api/players_list")
-      allPlayers = await res.json()
-    }catch(e){
-      console.error(e)
-    }
-
-    const existing = b.players.map(p=>p.id)
-    const available = allPlayers.filter(p=>!existing.includes(p.id))
-
-    let options = available.map(p =>
-      `<option value="${p.id}" data-phone="${p.phone}">
-        ${p.name}
-      </option>`).join("")
-
-    document.getElementById("inviteSection").innerHTML = `
-      <hr>
-      <select id="invitePlayer" class="form-select mb-2">${options}</select>
-      <button onclick="sendInvite()" class="btn btn-success w-100">
-        📲 WhatsApp uitnodigen
-      </button>
-    `
-  } else {
-    document.getElementById("inviteSection").innerHTML=""
   }
 
-  new bootstrap.Modal(document.getElementById("bookingModal")).show()
-}
+  async function openBookingModal(booking) {
+    currentBooking = { ...booking }
 
-function sendInvite(){
+    const title = `${formatDutch(booking.datetime)} (${Number(booking.duration || 60)} min)`
+    document.getElementById("bookingTitle").innerText = title
+    document.getElementById("bookingMeta").innerText =
+      `${booking.court} · ${booking.status === "confirmed" ? "Bevestigd" : "Nog niet bevestigd"}`
 
-  const booking = currentBooking
-
-  const select = document.getElementById("invitePlayer")
-  const option = select.options[select.selectedIndex]
-
-  const phone = option.dataset.phone
-
-  if(!phone){
-    alert("Geen telefoonnummer bekend")
-    return
-  }
-
-  const spelers = booking.players.map(p => `🎾 ${p.name}`).join("\n")
-
-  const message = `
-🎾 Padel uitnodiging
-
-📅 ${booking.datetime}
-📍 ${booking.court}
-
-👥 Spelers:
-${spelers}
-
-Speel je mee? 😄
-`
-
-  const url = `https://wa.me/${phone}?text=${encodeURIComponent(message.trim())}`
-
-  window.open(url, "_blank")
-}
-
-async function openPlayerModal(id){
-  currentPlayerId=id
-
-  const res=await fetch("/api/players")
-  const players=await res.json()
-  const p=players[id]
-
-  document.getElementById("playerName").innerText=p.name
-  document.getElementById("playerPhone").value=p.phone||""
-
-  renderRating(p.rating||3)
-  renderPunctuality(p.punctuality||3)
-
-  new bootstrap.Modal(document.getElementById("playerModal")).show()
-}
-
-function savePlayer(){
-  fetch("/api/update_player",{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({
-      id:currentPlayerId,
-      phone:document.getElementById("playerPhone").value,
-      rating:window.currentRating,
-      punctuality:window.currentPunctuality
+    let playersHtml = ""
+    booking.players.forEach(player => {
+      playersHtml += `
+        <div class="player-link" onclick="openPlayerModal('${escapeHtml(player.id)}')">
+          🎾 ${escapeHtml(player.name)}
+        </div>
+      `
     })
+    document.getElementById("bookingPlayers").innerHTML = playersHtml
+
+    if (Array.isArray(booking.players) && booking.players.length < 4) {
+      let allPlayers = []
+
+      try {
+        const res = await fetch("/api/players_list")
+        allPlayers = await res.json()
+      } catch (e) {
+        console.error("Players list ophalen mislukt", e)
+      }
+
+      const existingIds = booking.players.map(p => p.id)
+      const available = allPlayers.filter(p => !existingIds.includes(p.id))
+
+      if (available.length > 0) {
+        const options = available.map(player => {
+          return `
+            <option value="${escapeHtml(player.id)}" data-phone="${escapeHtml(player.phone || "")}">
+              ${escapeHtml(player.name)}
+            </option>
+          `
+        }).join("")
+
+        document.getElementById("inviteSection").innerHTML = `
+          <hr>
+          <div class="small fw-semibold mb-2">Speler uitnodigen</div>
+          <select id="invitePlayer" class="form-select mb-2">
+            ${options}
+          </select>
+          <button onclick="sendInvite()" class="btn btn-success w-100">
+            📲 Verstuur WhatsApp
+          </button>
+        `
+      } else {
+        document.getElementById("inviteSection").innerHTML = `
+          <hr>
+          <div class="small text-muted">Geen extra spelers beschikbaar.</div>
+        `
+      }
+    } else {
+      document.getElementById("inviteSection").innerHTML = ""
+    }
+
+    new bootstrap.Modal(document.getElementById("bookingModal")).show()
+  }
+
+  function sendInvite() {
+    const booking = currentBooking
+    const select = document.getElementById("invitePlayer")
+
+    if (!booking || !select) return
+
+    const option = select.options[select.selectedIndex]
+    const phone = normalizePhone(option?.dataset?.phone || "")
+
+    if (!phone) {
+      alert("Geen telefoonnummer bekend")
+      return
+    }
+
+    const playersText = booking.players
+      .map(p => `- ${p.name}`)
+      .join("\n")
+
+    const message = `
+Padel
+
+${formatDutch(booking.datetime)}
+${booking.court}
+Duur: ${Number(booking.duration || 60)} min
+
+Spelers:
+${playersText}
+
+Laat even weten of je kan.
+`.trim()
+
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
+    window.open(url, "_blank")
+  }
+
+  async function openPlayerModal(id) {
+    currentPlayerId = id
+
+    const res = await fetch("/api/players")
+    const players = await res.json()
+    const player = players[id]
+
+    if (!player) return
+
+    document.getElementById("playerName").innerText = player.name || "Speler"
+    document.getElementById("playerPhone").value = player.phone || ""
+
+    renderRating(Number(player.rating || 3))
+    renderPunctuality(Number(player.punctuality || 3))
+
+    new bootstrap.Modal(document.getElementById("playerModal")).show()
+  }
+
+  function renderRating(value) {
+    window.currentRating = value
+    let html = ""
+
+    for (let i = 1; i <= 5; i++) {
+      html += `
+        <span class="icon-score" onclick="renderRating(${i})">
+          ${i <= value ? "🎾" : "⚪"}
+        </span>
+      `
+    }
+
+    document.getElementById("playerRating").innerHTML = html
+  }
+
+  function renderPunctuality(value) {
+    window.currentPunctuality = value
+    let html = ""
+
+    for (let i = 1; i <= 5; i++) {
+      html += `
+        <span class="icon-score" onclick="renderPunctuality(${i})">
+          ${i <= value ? "⏰" : "⚪"}
+        </span>
+      `
+    }
+
+    document.getElementById("playerPunctuality").innerHTML = html
+  }
+
+  async function savePlayer() {
+    try {
+      await fetch("/api/update_player", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: currentPlayerId,
+          phone: document.getElementById("playerPhone").value,
+          rating: window.currentRating,
+          punctuality: window.currentPunctuality
+        })
+      })
+
+      showToast("💾 Speler opgeslagen", "success")
+
+      const modalEl = document.getElementById("playerModal")
+      const modal = bootstrap.Modal.getInstance(modalEl)
+      if (modal) modal.hide()
+    } catch (e) {
+      showToast("❌ Opslaan mislukt", "failed")
+    }
+  }
+
+  document.getElementById("configForm").addEventListener("submit", async function(e) {
+    e.preventDefault()
+
+    const formData = new FormData(this)
+
+    try {
+      const res = await fetch("/update_config", {
+        method: "POST",
+        body: formData
+      })
+
+      if (res.ok) {
+        showToast("💾 Config opgeslagen", "success")
+      } else {
+        showToast("❌ Opslaan mislukt", "failed")
+      }
+    } catch (err) {
+      showToast("❌ Fout bij opslaan", "failed")
+    }
   })
 
-  bootstrap.Modal.getInstance(document.getElementById("playerModal")).hide()
-}
+  setInterval(() => {
+    loadStatus()
+    loadLog()
+  }, 2000)
 
-function renderRating(val){
-  window.currentRating=val
-  let html=""
-  for(let i=1;i<=5;i++){
-    html+=`<span onclick="renderRating(${i})">${i<=val?"🎾":"⚪"}</span>`
-  }
-  document.getElementById("playerRating").innerHTML=html
-}
+  document.getElementById("logSelect").addEventListener("change", loadLog)
 
-function renderPunctuality(val){
-  window.currentPunctuality=val
-  let html=""
-  for(let i=1;i<=5;i++){
-    html+=`<span onclick="renderPunctuality(${i})">${i<=val?"⏰":"⚪"}</span>`
-  }
-  document.getElementById("playerPunctuality").innerHTML=html
-}
-
-setInterval(()=>{
   loadStatus()
-  loadLog()
-},2000)
-
-loadStatus()
-initCalendar()
+  initCalendar()
 </script>
-
 </body>
 </html>
