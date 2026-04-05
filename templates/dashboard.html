@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="nl">
 <head>
+<meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -41,39 +42,9 @@ body {
 <div class="col-lg-4">
 <div class="card p-3">
 <form method="POST" action="/update_config">
-
 <input name="days_ahead" class="form-control mb-2" value="{{ config.days_ahead }}">
 <input type="time" name="prep" class="form-control mb-2" value="{{ config.run_time.prep }}">
 <input type="time" name="booking" class="form-control mb-2" value="{{ config.run_time.booking }}">
-
-<hr>
-<h6>📅 Speelmomenten</h6>
-
-{% set order = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'] %}
-{% set idx = namespace(value=0) %}
-
-{% for day in order %}
-  {% for rule in config.booking_rules %}
-    {% if rule.day == day %}
-    <div class="mb-2 border p-2 rounded">
-      <b class="text-capitalize">{{ rule.day }}</b>
-
-      <div class="row mt-1">
-        <div class="col-6">
-          <input type="time" name="times_{{ idx.value }}" class="form-control"
-                 value="{{ rule.times[0] }}">
-        </div>
-        <div class="col-6">
-          <input type="number" name="duration_{{ idx.value }}" class="form-control"
-                 value="{{ rule.duration }}">
-        </div>
-      </div>
-    </div>
-    {% set idx.value = idx.value + 1 %}
-    {% endif %}
-  {% endfor %}
-{% endfor %}
-
 <button class="btn btn-dark w-100">💾 Opslaan</button>
 </form>
 </div>
@@ -150,34 +121,57 @@ body {
 </div>
 </div>
 
+<!-- TOAST -->
+<div id="toastContainer" class="position-fixed bottom-0 end-0 p-3"></div>
+
 <script>
 let chart
 let calendar
 let currentBooking=null
 let currentPlayerId=null
 
-// -------- STATUS + CHART --------
+// 🔥 COURT MAPPING
+const COURT_MAP = {
+  737381: "Court 1",
+  737383: "Court 2",
+  737385: "Court 3"
+}
+
+// -------- TOAST --------
+function showToast(msg,type="success"){
+  const toast=document.createElement("div")
+  toast.className=`toast show text-white bg-${type==="success"?"success":type==="error"?"danger":"warning"} mb-2`
+  toast.innerHTML=`<div class="toast-body">${msg}</div>`
+  document.getElementById("toastContainer").appendChild(toast)
+  setTimeout(()=>toast.remove(),4000)
+}
+
+// -------- STATUS --------
 async function loadStatus(){
+  try{
+    const res=await fetch("/api/status")
+    const data=await res.json()
 
-  const res=await fetch("/api/status")
-  const data=await res.json()
+    let s=0,f=0,r=0
+    let html="",dropdown=""
 
-  let success=0, failed=0, running=0
-  let html="", dropdown=""
+    data.forEach(x=>{
+      if(x.status==="success") s++
+      if(x.status==="failed") f++
+      if(x.status==="running") r++
 
-  data.forEach(r=>{
-    if(r.status==="success") success++
-    if(r.status==="failed") failed++
-    if(r.status==="running") running++
+      html+=`<div>${x.file} (${x.status})</div>`
+      dropdown+=`<option value="${x.file}">${x.file}</option>`
+    })
 
-    html+=`<div>${r.file} (${r.status})</div>`
-    dropdown+=`<option value="${r.file}">${r.file}</option>`
-  })
+    document.getElementById("statusList").innerHTML=html
+    document.getElementById("logSelect").innerHTML=dropdown
 
-  document.getElementById("statusList").innerHTML=html
-  document.getElementById("logSelect").innerHTML=dropdown
+    updateChart(s,f,r)
 
-  updateChart(success,failed,running)
+  }catch(e){
+    console.error(e)
+  }
 }
 
 function updateChart(s,f,r){
@@ -198,16 +192,20 @@ function updateChart(s,f,r){
   }
 }
 
-// -------- LOGS --------
+// -------- LOG --------
 async function loadLog(){
   const file=document.getElementById("logSelect").value
   if(!file) return
 
-  const res=await fetch(`/api/log/${file}`)
-  const data=await res.json()
+  try{
+    const res=await fetch(`/api/log/${file}`)
+    const data=await res.json()
 
-  document.getElementById("liveLog").innerHTML=
-    data.lines.map(l=>`<div>${l}</div>`).join("")
+    document.getElementById("liveLog").innerHTML=
+      data.lines.map(l=>`<div>${l}</div>`).join("")
+  }catch(e){
+    console.error(e)
+  }
 }
 
 // -------- DATE --------
@@ -230,7 +228,8 @@ async function initCalendar(){
   const bookings=await res.json()
 
   const events=bookings.map(b=>({
-    title:`${b.court} (${b.duration}m)`,
+
+    title:`${COURT_MAP[b.court_id] || b.court} (${b.duration}m)`,
     start:formatISO(b.datetime),
     color:b.status==="confirmed"?"#28a745":"#ffc107",
     extendedProps:b
@@ -256,7 +255,9 @@ async function initCalendar(){
 
 // -------- FETCH --------
 async function fetchBookings(){
+  showToast("📥 Sync...", "warning")
   await fetch("/api/fetch_bookings")
+  showToast("✅ Klaar")
   initCalendar()
 }
 
@@ -342,7 +343,7 @@ async function addPlayerToBooking(){
     })
   })
 
-  alert("Speler toegevoegd")
+  showToast("✅ Speler toegevoegd")
   fetchBookings()
 }
 
@@ -375,6 +376,7 @@ function savePlayer(){
     })
   })
 
+  showToast("💾 Speler opgeslagen")
   bootstrap.Modal.getInstance(document.getElementById("playerModal")).hide()
 }
 
