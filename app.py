@@ -244,5 +244,33 @@ def api_log(filename):
 
     return {"lines": lines}
 
+# ---------------- UPDATE CONFIG ----------------
+@app.route("/update_config", methods=["POST"])
+def update_config():
+
+    cfg = load_config()
+
+    # basis velden
+    cfg["days_ahead"] = int(request.form.get("days_ahead", 7))
+    cfg["run_time"]["prep"] = request.form.get("prep")
+    cfg["run_time"]["booking"] = request.form.get("booking")
+
+    # booking rules
+    for i, rule in enumerate(cfg["booking_rules"]):
+
+        times_raw = request.form.get(f"times_{i}", "")
+
+        cfg["booking_rules"][i]["times"] = [
+            t.strip() for t in times_raw.split(",") if t.strip()
+        ]
+
+        cfg["booking_rules"][i]["duration"] = int(
+            request.form.get(f"duration_{i}", 60)
+        )
+
+    save_config(cfg)
+
+    return redirect("/dashboard")
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
